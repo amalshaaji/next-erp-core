@@ -14,6 +14,7 @@ def environment_bool(name, default):
 
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "dev-only-change-me")
 DEBUG = environment_bool("DJANGO_DEBUG", "False")
+PREVIEW = environment_bool("DJANGO_PREVIEW", "False")
 ALLOWED_HOSTS = [host.strip() for host in os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if host.strip()]
 
 INSTALLED_APPS = [
@@ -105,10 +106,13 @@ if not DEBUG:
         raise RuntimeError("Production DJANGO_CSRF_TRUSTED_ORIGINS values must use HTTPS origins.")
     if not database_url.startswith(("postgres://", "postgresql://")):
         raise RuntimeError("Production DATABASE_URL must point to PostgreSQL.")
-    if not required_production_settings["CLERK_PUBLISHABLE_KEY"].startswith("pk_live_"):
-        raise RuntimeError("Production requires a live Clerk publishable key (pk_live_…).")
-    if not required_production_settings["CLERK_SECRET_KEY"].startswith("sk_live_"):
-        raise RuntimeError("Production requires a live Clerk secret key (sk_live_…).")
+    publishable_prefix = "pk_test_" if PREVIEW else "pk_live_"
+    secret_prefix = "sk_test_" if PREVIEW else "sk_live_"
+    environment_name = "preview" if PREVIEW else "production"
+    if not required_production_settings["CLERK_PUBLISHABLE_KEY"].startswith(publishable_prefix):
+        raise RuntimeError(f"{environment_name.title()} requires a {publishable_prefix} Clerk publishable key.")
+    if not required_production_settings["CLERK_SECRET_KEY"].startswith(secret_prefix):
+        raise RuntimeError(f"{environment_name.title()} requires a {secret_prefix} Clerk secret key.")
     if not required_production_settings["CACHE_URL"].startswith(("redis://", "rediss://")):
         raise RuntimeError("Production CACHE_URL must use redis:// or rediss://.")
     SECURE_HSTS_SECONDS = 15_552_000

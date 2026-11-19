@@ -68,6 +68,7 @@ Give a small mobile shop one beginner-friendly place to record sales, stock, sup
 - Authentication: Clerk; authorization and shop isolation: Django.
 - Production database: Supabase PostgreSQL over TLS, with Django ORM migrations as the schema source of truth.
 - Production requires `DEBUG=False`, a strong unique Django secret, exact hosts and HTTPS origins, live Clerk keys, PostgreSQL, and a shared Redis cache.
+- Hosted previews may use `DEBUG=False` with `DJANGO_PREVIEW=True` and Clerk test keys; production always requires live Clerk keys.
 - Production operations require managed HTTPS, static file hosting, monitored errors, database backups, and a rehearsed restore process.
 - Deployment provider, production domain, Redis service, backup policy, and alerting provider are environment decisions and are not provisioned by this repository.
 
