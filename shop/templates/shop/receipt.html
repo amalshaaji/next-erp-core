@@ -1,0 +1,97 @@
+{% extends 'shop/base.html' %}
+{% load static %}
+
+{% block title %}Bill {{ sale.receipt_number }}{% endblock %}
+
+{% block content %}
+<div class="receipt-wrap bill-page">
+  <div class="receipt-actions">
+    <a class="button button-secondary" href="{% url 'pos' %}">＋ New sale</a>
+    <button class="button button-primary" type="button" onclick="window.print()">Print bill</button>
+    {% if not sale.void_record %}
+      {% if request.membership.can_refunds %}<a class="button button-secondary" href="{% url 'returns' %}?receipt={{ sale.receipt_number }}">Start return</a>{% endif %}
+      {% if request.membership.can_voids and not has_returns %}<a class="button button-danger" href="{% url 'void_sale' sale.pk %}">Void sale</a>{% endif %}
+    {% endif %}
+  </div>
+
+  <article class="bill" aria-labelledby="bill-shop-name">
+    {% if sale.void_record %}
+      <div class="bill-void"><strong>VOIDED</strong><span>{{ sale.void_record.created_at|date:"d M Y, g:i A" }} · {{ sale.void_record.reason }}</span></div>
+    {% endif %}
+
+    <header class="bill-header">
+      <div class="bill-brand">
+        <img src="{% static 'shop/mobix-care-logo.png' %}" alt="MobiX Care logo" width="76" height="76">
+        <div>
+          <p class="bill-kicker">SALES RECEIPT</p>
+          <h1 id="bill-shop-name">{{ sale.shop_name_snapshot|default:sale.shop.name }}</h1>
+          <p class="bill-tagline">Mobile shop</p>
+        </div>
+      </div>
+      <div class="bill-reference">
+        <span>Receipt number</span>
+        <strong>{{ sale.receipt_number }}</strong>
+        <small>{{ sale.created_at|date:"d M Y · g:i A" }}</small>
+        {% if sale.void_record %}<span class="bill-status is-void">Voided</span>{% else %}<span class="bill-status">Paid</span>{% endif %}
+      </div>
+    </header>
+
+    <section class="bill-parties" aria-label="Sale details">
+      <div><span>Customer</span><strong>{{ sale.customer_name|default:"Walk-in customer" }}</strong></div>
+      <div><span>Served by</span><strong>{{ sale.cashier.display_name|default:sale.cashier.email|default:"Shop staff" }}</strong></div>
+      <div><span>Currency</span><strong>{{ sale.currency }}</strong></div>
+    </section>
+
+    <div class="bill-table-wrap">
+      <table class="bill-items">
+        <thead>
+          <tr><th scope="col">Item description</th><th scope="col" class="bill-number">Qty</th><th scope="col" class="bill-number">Unit price</th><th scope="col" class="bill-number">Tax</th><th scope="col" class="bill-number">Amount</th></tr>
+        </thead>
+        <tbody>
+          {% for line in sale.lines.all %}
+            <tr>
+              <td class="bill-item-description">
+                <strong>{{ line.description }}</strong>
+                <small>{% if line.item_kind == 'service' %}Service{% elif line.device and line.device.is_second_hand %}Pre-owned device{% elif line.device %}Serialized device{% else %}Product{% endif %}</small>
+              </td>
+              <td class="bill-number">{{ line.quantity }} pcs</td>
+              <td class="bill-number">{{ sale.currency }} {{ line.unit_price|floatformat:2 }}</td>
+              <td class="bill-number">{{ sale.currency }} {{ line.tax_amount|floatformat:2 }}</td>
+              <td class="bill-number bill-line-total">{{ sale.currency }} {{ line.line_total|floatformat:2 }}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="5" class="bill-empty">No items were recorded on this receipt.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <section class="bill-summary" aria-label="Bill totals">
+      <div class="bill-totals">
+        <div><span>Subtotal</span><strong>{{ sale.currency }} {{ sale.subtotal|floatformat:2 }}</strong></div>
+        {% if sale.discount_total %}<div><span>Discount</span><strong>− {{ sale.currency }} {{ sale.discount_total|floatformat:2 }}</strong></div>{% endif %}
+        <div><span>Tax{% if sale.tax_rate_snapshot %} ({{ sale.tax_rate_snapshot|floatformat:-3 }}%){% endif %}</span><strong>{{ sale.currency }} {{ sale.tax_total|floatformat:2 }}</strong></div>
+        <div class="bill-grand-total"><span>Total paid</span><strong>{{ sale.currency }} {{ sale.total|floatformat:2 }}</strong></div>
+      </div>
+    </section>
+
+    <section class="bill-payment-section" aria-label="Payment activity">
+      <div class="bill-section-heading"><h2>Payment activity</h2><span>{{ sale.payments.count }} record{{ sale.payments.count|pluralize }}</span></div>
+      {% for payment in sale.payments.all %}
+        <div class="bill-payment-row">
+          <div><strong>{{ payment.get_kind_display }}</strong><small>{{ payment.get_tender_display|default:payment.tender }}{% if payment.reference %} · Ref {{ payment.reference }}{% endif %}</small></div>
+          <strong>{{ sale.currency }} {{ payment.amount|floatformat:2 }}</strong>
+        </div>
+      {% empty %}
+        <p class="bill-muted">No payment activity is recorded.</p>
+      {% endfor %}
+    </section>
+
+    <footer class="bill-footer">
+      {% if sale.receipt_footer_snapshot %}<p>{{ sale.receipt_footer_snapshot }}</p>{% endif %}
+      <strong>Thank you for your purchase.</strong>
+      <small>Please keep this bill for your records.</small>
+    </footer>
+  </article>
+</div>
+{% endblock %}

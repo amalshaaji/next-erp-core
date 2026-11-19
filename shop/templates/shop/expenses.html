@@ -1,0 +1,30 @@
+{% extends 'shop/base.html' %}
+{% block title %}Shop expenses{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div><p class="eyebrow">SHOP COSTS</p><h1>Shop expenses</h1><p class="subheading">Record rent, electricity, and other shop bills.</p></div>
+</header>
+<section class="metric-grid expense-summary"><article class="metric-card"><span class="metric-label">Recorded expenses in {{ request.membership.shop.currency }}</span><strong>{{ request.membership.shop.currency }} {{ total|floatformat:2 }}</strong><small>Uncorrected expenses; all recorded dates.</small></article></section>
+<section class="panel form-panel expense-entry-form">
+  <div class="panel-heading"><div><h2>Record an expense</h2><p>Save each bill or shop cost once it has been paid.</p></div></div>
+  <form method="post">{% csrf_token %}<input type="hidden" name="action" value="create">
+    {% if form.non_field_errors %}<div class="form-errors">{{ form.non_field_errors }}</div>{% endif %}
+    <div class="form-grid">{% for field in form %}<div class="form-field {% if field.name == 'description' %}field-wide{% endif %}"><label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="required">*</span>{% endif %}</label>{{ field }}{% if field.help_text %}<small class="help-text">{{ field.help_text }}</small>{% endif %}{% for error in field.errors %}<small class="field-error">{{ error }}</small>{% endfor %}</div>{% endfor %}</div>
+    <div class="form-actions"><button class="button button-primary">Save expense</button></div>
+  </form>
+</section>
+<section class="panel expense-history">
+  <div class="panel-heading"><div><h2>Expense history</h2><p>Entries cannot be edited. Correct a mistake with a linked correction.</p></div></div>
+  {% if entries %}<div class="table-wrap"><table><thead><tr><th>Date</th><th>Expense</th><th>Details</th><th>Paid by</th><th>Amount</th><th>Recorded by</th><th>Correction</th></tr></thead><tbody>
+    {% for entry in entries %}<tr>
+      <td>{{ entry.expense_date|date:"d M Y" }}</td>
+      <td>{{ entry.get_category_display }}{% if entry.reversal_of %}<br><span class="badge badge-amber">Correction</span>{% endif %}</td>
+      <td>{{ entry.description|default:"—" }}{% if entry.reference %}<small>Ref: {{ entry.reference }}</small>{% endif %}{% if entry.reversal_of %}<small>Reason: {{ entry.reversal_reason }}</small>{% endif %}</td>
+      <td>{{ entry.get_payment_method_display }}</td>
+      <td>{{ entry.currency }} {{ entry.amount|floatformat:2 }}</td>
+      <td>{{ entry.created_by.display_name|default:entry.created_by.email }}</td>
+      <td>{% if entry.reversal_of %}<span class="muted">Linked to #{{ entry.reversal_of_id }}</span>{% elif entry.reversal %}<span class="badge badge-amber">Corrected</span>{% else %}<details class="expense-correction"><summary>Correct</summary><form method="post">{% csrf_token %}<input type="hidden" name="action" value="reverse"><input type="hidden" name="expense_id" value="{{ entry.pk }}"><label for="reason-{{ entry.pk }}">Reason</label><input id="reason-{{ entry.pk }}" name="reason" maxlength="200" required><button class="button button-secondary">Save correction</button></form></details>{% endif %}</td>
+    </tr>{% endfor %}
+  </tbody></table></div>{% else %}<div class="empty-state"><h3>No expenses recorded</h3><p>Start with your latest rent, electricity, or other shop bill.</p></div>{% endif %}
+</section>
+{% endblock %}

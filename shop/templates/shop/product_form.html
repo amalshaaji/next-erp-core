@@ -1,0 +1,28 @@
+{% extends 'shop/base.html' %}
+{% block title %}Add a product{% endblock %}
+{% block content %}
+<header class="page-header"><div><p class="eyebrow">PRODUCT CATALOG</p><h1>Add a product or service</h1><p class="subheading">Choose whether this item is stocked or billed as a service.</p></div></header>
+<section class="panel form-panel product-form-panel">
+  <form method="post">{% csrf_token %}{{ form.tracking }}
+    {% if form.non_field_errors %}<div class="form-errors">{{ form.non_field_errors }}</div>{% endif %}
+    <fieldset class="product-form-section"><legend>Product details</legend><div class="form-grid">{% include 'shop/includes/product_form_fields.html' with fields=product_detail_fields %}</div></fieldset>
+    <fieldset class="product-form-section"><legend>Sale settings</legend><div class="form-grid">{% include 'shop/includes/product_form_fields.html' with fields=sale_setting_fields %}</div></fieldset>
+    <fieldset class="product-form-section"><legend>Stock levels</legend><div class="form-grid"><div class="form-field"><label>Stock tracking</label><input value="Quantity (pieces)" readonly aria-readonly="true"><small class="help-text">Inventory is counted by the number of individual pieces in stock.</small></div>{% include 'shop/includes/product_form_fields.html' with fields=stock_fields %}</div></fieldset>
+    <div class="form-actions"><a class="button button-secondary" href="{% url 'products' %}">Cancel</a><button class="button button-primary">Save product</button></div>
+  </form>
+</section>
+{% endblock %}
+{% block scripts %}<script>
+const kindField = document.getElementById('id_kind');
+const secondHandField = document.getElementById('id_is_second_hand');
+const openingStockField = document.getElementById('opening-stock-field');
+function updateOpeningStockField() {
+  const isService = kindField.value === 'service';
+  secondHandField.disabled = isService;
+  if (isService) secondHandField.checked = false;
+  openingStockField.hidden = isService;
+}
+kindField.addEventListener('change', updateOpeningStockField);
+secondHandField.addEventListener('change', updateOpeningStockField);
+updateOpeningStockField();
+</script>{% endblock %}

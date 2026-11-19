@@ -1,0 +1,32 @@
+{% extends 'shop/base.html' %}
+{% block title %}Suppliers & purchases{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div><p class="eyebrow">PURCHASING</p><h1>Suppliers & purchases</h1><p class="subheading">Manage supplier contacts, assigned products, and received stock.</p></div>
+  <a class="button button-primary" href="{% url 'receive_stock' %}">Receive stock</a>
+</header>
+<div class="supplier-grid">
+  <section class="panel form-panel">
+    <div class="panel-heading"><div><h2>Add a supplier</h2><p>Save contact details for product records and stock receipts.</p></div></div>
+    <form method="post">{% csrf_token %}
+      {% if form.non_field_errors %}<div class="form-errors">{{ form.non_field_errors }}</div>{% endif %}
+      <div class="form-grid">{% for field in form %}<div class="form-field"><label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="required">*</span>{% endif %}</label>{{ field }}{% for error in field.errors %}<small class="field-error">{{ error }}</small>{% endfor %}</div>{% endfor %}</div>
+      <div class="form-actions"><button class="button button-primary">Save supplier</button></div>
+    </form>
+  </section>
+  <section class="panel supplier-directory">
+    <div class="panel-heading"><div><h2>Supplier list</h2><p>Supplier contacts and the products assigned to them.</p></div></div>
+    {% if suppliers %}<div class="supplier-cards">
+      {% for supplier in suppliers %}<article class="supplier-card">
+        <div class="supplier-card-heading"><span class="product-dot">{{ supplier.name|slice:":1"|upper }}</span><div class="supplier-card-title"><h3>{{ supplier.name }}</h3>{% if supplier.is_active %}<span class="badge badge-green">Active</span>{% else %}<span class="badge">Archived</span>{% endif %}</div>
+          {% if supplier.is_active %}<form method="post" onsubmit="return confirm('Archive {{ supplier.name|escapejs }}? Existing purchase history stays available.')">{% csrf_token %}<input type="hidden" name="action" value="archive"><input type="hidden" name="supplier_id" value="{{ supplier.pk }}"><button class="text-button danger-text">Archive</button></form>{% endif %}
+        </div>
+        <div class="supplier-info-grid"><div><span>Date added</span><strong>{% if supplier.created_on %}{{ supplier.created_on|date:"d M Y" }}{% else %}Not recorded{% endif %}</strong></div><div><span>Phone</span><strong>{% if supplier.phone %}{{ supplier.phone }}{% else %}Not provided{% endif %}</strong></div><div><span>Email</span><strong>{% if supplier.email %}{{ supplier.email }}{% else %}Not provided{% endif %}</strong></div><div><span>Purchase records</span><strong>{{ supplier.purchase_count }}</strong></div><div><span>Last stock receipt</span><strong>{% if supplier.last_received %}{{ supplier.last_received|date:"d M Y" }}{% else %}No receipts yet{% endif %}</strong></div></div>
+        <div class="supplier-product-section"><div class="supplier-section-heading"><h4>Assigned products</h4><span>{{ supplier.products.all|length }} product{{ supplier.products.all|length|pluralize }}</span></div>
+          {% with supplier_products=supplier.products.all %}{% if supplier_products %}<div class="table-wrap"><table><thead><tr><th>Product</th><th>SKU</th><th>Category</th><th>In stock</th><th>Price</th></tr></thead><tbody>{% for product in supplier_products %}<tr><td><strong>{{ product.name }}</strong>{% if not product.is_active %}<small>Inactive</small>{% endif %}</td><td>{{ product.sku|default:"—" }}</td><td>{{ product.category|default:"Uncategorized" }}</td><td>{% if product.kind == 'service' %}<span class="muted">Not stocked</span>{% else %}{{ product.current_stock|default:0 }} pcs{% endif %}</td><td>{{ request.membership.shop.currency }} {{ product.price|floatformat:2 }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<p class="supplier-empty">No products assigned. Choose this supplier when adding a product.</p>{% endif %}{% endwith %}
+        </div>
+      </article>{% endfor %}
+    </div>{% else %}<div class="empty-state compact"><h3>No suppliers yet</h3><p>Add a supplier to choose it on product and stock forms.</p></div>{% endif %}
+  </section>
+</div>
+{% endblock %}

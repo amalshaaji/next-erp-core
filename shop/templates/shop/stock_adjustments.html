@@ -1,0 +1,80 @@
+{% extends 'shop/base.html' %}
+
+{% block title %}Stock count{% endblock %}
+
+{% block content %}
+<div class="stock-count-page">
+<header class="page-header">
+  <div>
+    <p class="eyebrow">INVENTORY CONTROL</p>
+    <h1>Stock count</h1>
+    <p class="subheading">Count quantity-based products and record a correction with its reason.</p>
+  </div>
+  <a class="button button-secondary" href="{% url 'products' %}">View stock</a>
+</header>
+
+<div class="stock-count-layout">
+<section class="panel form-panel stock-adjust-single" aria-labelledby="stock-count-form-title">
+  <div class="panel-heading">
+    <div>
+      <h2 id="stock-count-form-title">Record a stock count</h2>
+      <p>Choose a product, enter your count, and explain the correction.</p>
+    </div>
+  </div>
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="mode" value="quantity">
+    {% if quantity_form.non_field_errors %}<div class="form-errors" role="alert">{{ quantity_form.non_field_errors }}</div>{% endif %}
+    <div class="form-grid">
+      {% for field in quantity_form %}
+        <div class="form-field stock-field-{{ field.name }} {% if field.name == 'note' or field.name == 'product' %}field-wide{% endif %}">
+          <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="required" aria-hidden="true">*</span>{% else %}<span class="stock-optional">(optional)</span>{% endif %}</label>
+          {{ field }}
+          {% if field.help_text %}<small class="help-text" id="{{ field.auto_id }}_helptext">{{ field.help_text }}</small>{% endif %}
+          {% if field.errors %}<div class="field-error" id="{{ field.auto_id }}_error" role="alert">{% for error in field.errors %}<div>{{ error }}</div>{% endfor %}</div>{% endif %}
+        </div>
+      {% endfor %}
+    </div>
+    <div class="form-actions"><a class="button button-secondary" href="{% url 'products' %}">Cancel</a><button type="submit" class="button button-primary">Save stock count</button></div>
+  </form>
+</section>
+
+<aside class="stock-count-guide" aria-labelledby="stock-count-guide-title">
+  <span class="stock-guide-icon">{% include 'shop/includes/icon.html' with name='box' %}</span>
+  <h2 id="stock-count-guide-title">A quick guide</h2>
+  <ol>
+    <li><strong>Count the pieces</strong><p>Count the physical stock for one product.</p></li>
+    <li><strong>Enter the total</strong><p>Use the total you counted, not the amount to add or remove. Enter 0 if none remain.</p></li>
+    <li><strong>Give a reason</strong><p>Choose the reason and add a note if more detail would help.</p></li>
+  </ol>
+  <p class="stock-guide-footnote">The system calculates the difference and keeps a record of the correction.</p>
+</aside>
+</div>
+
+<section class="panel adjustment-history" aria-labelledby="stock-count-history-title">
+  <div class="panel-heading">
+    <div><h2 id="stock-count-history-title">Recent stock counts</h2><p>Latest quantity-based corrections recorded for this shop.</p></div>
+  </div>
+  {% if recent %}
+    <div class="table-wrap" role="region" aria-label="Recent stock counts" tabindex="0">
+      <table>
+        <thead><tr><th scope="col">Product</th><th scope="col" class="stock-change-column">Change</th><th scope="col">Reason / note</th><th scope="col">Staff</th><th scope="col">Date</th></tr></thead>
+        <tbody>
+          {% for movement in recent %}
+            <tr>
+              <td><strong>{{ movement.product.name }}</strong>{% if movement.product.sku %}<small>{{ movement.product.sku }}</small>{% endif %}</td>
+              <td class="stock-change-column">{% if movement.quantity_delta > 0 %}<span class="stock-change positive-change">+{{ movement.quantity_delta }} pcs</span>{% elif movement.quantity_delta < 0 %}<span class="stock-change negative-change">{{ movement.quantity_delta }} pcs</span>{% else %}<span class="stock-change">No change</span>{% endif %}</td>
+              <td class="stock-history-note">{{ movement.note }}</td>
+              <td>{{ movement.actor.display_name|default:movement.actor.email|default:"—" }}</td>
+              <td class="stock-history-date"><time datetime="{{ movement.created_at|date:'c' }}">{{ movement.created_at|date:"d M Y" }}<small>{{ movement.created_at|date:"g:i A" }}</small></time></td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="empty-state"><span class="empty-icon">{% include 'shop/includes/icon.html' with name='box' %}</span><h3>No stock counts yet</h3><p>Save your first count above. The product, correction, reason, and staff member will appear here.</p></div>
+  {% endif %}
+</section>
+</div>
+{% endblock %}

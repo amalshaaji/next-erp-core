@@ -1,0 +1,84 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Next{% endblock %} · Next</title>
+  <link rel="icon" type="image/png" href="{% static 'shop/favicon.png' %}?v=27613e58122e">
+  <link rel="stylesheet" href="{% static 'shop/shop.css' %}?v=20261120-7">
+  <link rel="stylesheet" href="{% static 'shop/reference-theme.css' %}?v=20261120-3">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="{% url 'dashboard' %}"><img class="brand-logo" src="{% static 'shop/favicon.png' %}?v=27613e58122e" width="36" height="36" alt=""><strong>Next</strong></a>
+      {% with current=request.resolver_match.url_name %}
+      <nav class="topnav" aria-label="Main navigation">
+        <a href="{% url 'dashboard' %}" class="nav-link {% if current == 'dashboard' %}is-active{% endif %}" {% if current == 'dashboard' %}aria-current="page"{% endif %}>{% include 'shop/includes/icon.html' with name='home' %}Overview</a>
+        <a href="{% url 'pos' %}" class="nav-link {% if current == 'pos' %}is-active{% endif %}" {% if current == 'pos' %}aria-current="page"{% endif %}>{% include 'shop/includes/icon.html' with name='bag' %}New sale</a>
+        <a href="{% url 'products' %}" class="nav-link {% if current == 'products' or current == 'product_create' or current == 'product_import' %}is-active{% endif %}" {% if current == 'products' %}aria-current="page"{% endif %}>{% include 'shop/includes/icon.html' with name='box' %}Inventory</a>
+        <a href="{% url 'sales' %}" class="nav-link {% if current == 'sales' or current == 'receipt' %}is-active{% endif %}" {% if current == 'sales' %}aria-current="page"{% endif %}>{% include 'shop/includes/icon.html' with name='chart' %}Sales</a>
+        {% if request.membership.can_reports %}<a href="{% url 'reports' %}" class="nav-link {% if current == 'reports' %}is-active{% endif %}" {% if current == 'reports' %}aria-current="page"{% endif %}>{% include 'shop/includes/icon.html' with name='receipt' %}Reports</a>{% endif %}
+        {% if request.membership.can_stock_adjust or request.membership.can_receive_purchases or request.membership.can_expenses or request.membership.can_refunds or request.membership.role == 'admin' %}<details class="nav-more"><summary class="nav-link">{% include 'shop/includes/icon.html' with name='more' %}More <span aria-hidden="true">⌄</span></summary><div class="nav-menu">
+          {% if request.membership.can_stock_adjust %}<a href="{% url 'stock_adjustments' %}">Stock count</a>{% endif %}
+          {% if request.membership.can_receive_purchases %}<a href="{% url 'suppliers' %}">Suppliers & purchases</a>{% endif %}
+          {% if request.membership.can_expenses %}<a href="{% url 'expenses' %}">Shop expenses</a>{% endif %}
+          {% if request.membership.can_refunds %}<a href="{% url 'returns' %}">Returns & refunds</a>{% endif %}
+          {% if request.membership.role == 'admin' %}<a href="{% url 'team' %}">Staff & permissions</a><a href="{% url 'shop_settings' %}">Shop settings</a>{% endif %}
+        </div></details>{% endif %}
+      </nav>
+      {% endwith %}
+      <div class="sidebar-bottom"><span class="avatar">{{ request.membership.display_name|default:request.membership.email|slice:":1"|upper }}</span><span class="user-label">{{ request.membership.display_name|default:request.membership.email|default:"Shop user" }}<small>{{ request.membership.get_role_display }}</small></span><button class="icon-button" id="clerk-sign-out" type="button" data-clerk-frontend-api="{{ clerk_frontend_api_url }}" data-clerk-publishable-key="{{ clerk_publishable_key }}" aria-label="Sign out">↗</button></div>
+    </header>
+    <main class="main-content">
+      {% if messages %}<div class="messages">{% for message in messages %}<div class="message {{ message.tags }}">{{ message }}</div>{% endfor %}</div>{% endif %}
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+  <script>
+    (() => {
+      const button = document.getElementById('clerk-sign-out');
+      if (!button) return;
+      let clerkReady;
+      function loadClerk() {
+        if (!clerkReady) {
+          clerkReady = (async () => {
+            if (!window.Clerk) await new Promise((resolve, reject) => {
+              const script = document.createElement('script');
+              script.crossOrigin = 'anonymous';
+              script.dataset.clerkPublishableKey = button.dataset.clerkPublishableKey;
+              script.src = `https://${button.dataset.clerkFrontendApi}/npm/@clerk/clerk-js@6/dist/clerk.browser.js`;
+              script.onload = resolve;
+              script.onerror = () => reject(new Error('Clerk could not be loaded'));
+              document.head.appendChild(script);
+            });
+            await window.Clerk.load({signInUrl: '/sign-in/'});
+            return window.Clerk;
+          })().catch((error) => {
+            clerkReady = undefined;
+            throw error;
+          });
+        }
+        return clerkReady;
+      }
+      // Keep Clerk's session cookie fresh while any protected page is open.
+      loadClerk().catch(() => {
+        console.error('Session refresh could not start. Check your connection.');
+      });
+      button.addEventListener('click', async () => {
+        button.disabled = true;
+        try {
+          const clerk = await loadClerk();
+          await clerk.signOut({redirectUrl: '/sign-in/'});
+        } catch (error) {
+          console.error('Sign out could not complete. Check your connection.');
+          button.disabled = false;
+          window.alert('Sign out could not load. Check your connection and try again.');
+        }
+      });
+    })();
+  </script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

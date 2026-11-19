@@ -1,0 +1,20 @@
+{% extends 'shop/base.html' %}{% block title %}Receive stock{% endblock %}
+{% block content %}<header class="page-header"><div><p class="eyebrow">PURCHASING</p><h1>Receive stock</h1><p class="subheading">Record new or second-hand items as they arrive in your shop.</p></div><a class="button button-secondary" href="{% url 'suppliers' %}">Manage suppliers</a></header><section class="panel form-panel"><div class="notice"><strong>Quantity stock</strong><p>Enter how many pieces arrived. Use the second-hand checkbox for used stock, then enter its purchase cost.</p></div><form method="post">{% csrf_token %}{% if form.non_field_errors %}<div class="form-errors">{{ form.non_field_errors }}</div>{% endif %}<div class="form-grid">{% for field in form %}<div class="form-field {% if field.name == 'imeis' or field.name == 'condition_notes' or field.name == 'included_accessories' %}field-wide{% endif %} {% if field.name == 'condition' or field.name == 'condition_notes' or field.name == 'included_accessories' or field.name == 'acquisition_source' %}second-hand-detail{% endif %} {% if field.name == 'imeis' %}imei-field{% endif %}"><label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="required">*</span>{% endif %}</label>{{ field }}{% if field.help_text %}<small class="help-text">{{ field.help_text }}</small>{% endif %}{% for error in field.errors %}<small class="field-error">{{ error }}</small>{% endfor %}</div>{% endfor %}</div><div class="form-actions"><a class="button button-secondary" href="{% url 'products' %}">Cancel</a><button class="button button-primary">Add to stock</button></div></form></section>{% endblock %}
+{% block scripts %}<script>
+const receivedProduct = document.getElementById('id_product');
+const secondHandToggle = document.getElementById('id_is_second_hand');
+const secondHandDetails = document.querySelectorAll('.second-hand-detail');
+const imeiField = document.querySelector('.imei-field');
+function updateStockFields() {
+  const selected = receivedProduct.options[receivedProduct.selectedIndex];
+  const label = selected?.textContent || '';
+  const serialized = label.includes('IMEI / serial');
+  const secondHandProduct = label.includes('· Second-hand');
+  imeiField.hidden = !serialized;
+  secondHandToggle.checked = secondHandProduct || secondHandToggle.checked;
+  for (const field of secondHandDetails) field.hidden = !serialized || !secondHandToggle.checked;
+}
+receivedProduct.addEventListener('change', updateStockFields);
+secondHandToggle.addEventListener('change', updateStockFields);
+updateStockFields();
+</script>{% endblock %}
