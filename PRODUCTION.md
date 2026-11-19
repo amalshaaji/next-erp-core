@@ -53,7 +53,7 @@ Configure the existing Render service with the repository root as its root direc
 | Start command | `python -m gunicorn config.wsgi:application --bind 0.0.0.0:$PORT` |
 | Health check path | `/health/` |
 
-Install requirements on every build: Gunicorn is the production WSGI server and must be installed before the start command runs. The Django project module is `config`; use its existing WSGI application. Set all environment variables from section 2 in Render's environment settings, including `DJANGO_SECRET_KEY` (the app does not read `SECRET_KEY`). Keep `DJANGO_DEBUG=False`. For a temporary Render preview, set `DJANGO_PREVIEW=True` and use matching `pk_test_`/`sk_test_` Clerk keys; never use that setting for production.
+Install requirements on every build: Gunicorn is the production WSGI server and must be installed before the start command runs. WhiteNoise serves the collected static files from the web process. The Django project module is `config`; use its existing WSGI application. Set all environment variables from section 2 in Render's environment settings, including `DJANGO_SECRET_KEY` (the app does not read `SECRET_KEY`). Keep `DJANGO_DEBUG=False`. For a temporary Render preview, set `DJANGO_PREVIEW=True` and use matching `pk_test_`/`sk_test_` Clerk keys; never use that setting for production.
 
 Run `python manage.py migrate --noinput` as the controlled release step before routing traffic to the new version. Arrange static file hosting for `staticfiles/` as required above; Gunicorn alone does not serve those assets. Keep the existing Supabase PostgreSQL and Redis services.
 
