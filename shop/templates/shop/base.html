@@ -53,7 +53,7 @@
               script.onerror = () => reject(new Error('Clerk could not be loaded'));
               document.head.appendChild(script);
             });
-            await window.Clerk.load({signInUrl: '/sign-in/'});
+            await window.Clerk.load({signInUrl: '/sign-in/', allowedRedirectOrigins: ['https://next-erp-core.onrender.com']});
             return window.Clerk;
           })().catch((error) => {
             clerkReady = undefined;
