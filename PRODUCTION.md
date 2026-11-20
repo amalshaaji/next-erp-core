@@ -4,7 +4,7 @@ This checklist covers a first production deployment of the mobile shop ERP. Comp
 
 ## 1. Provision the services
 
-- Create separate production Clerk and Supabase projects. Use a production Clerk instance and restrict the Clerk application to the deployed web origins.
+- Create a production Supabase project. Configure the Auth email templates, redirect URLs, and allowed site URLs for the deployed web origins.
 - Choose the Django hosting platform, public hostname, and supported PostgreSQL connection mode. Use Supabase's direct connection where the host supports IPv6, or its session pooler for persistent application connections. Confirm the provider's current guidance for your host before deployment.
 - Create a dedicated PostgreSQL application role with only the privileges required by the application. Do not use a Supabase service role or expose database credentials to browser code.
 - Configure TLS from Django to PostgreSQL and HTTPS from browsers to Django. Set the proxy's forwarded-protocol header only when the hosting platform controls it.
@@ -17,12 +17,17 @@ Set these values in the hosting provider's secret manager, not in source control
 | --- | --- |
 | `DJANGO_SECRET_KEY` | Unique, randomly generated secret; never the development default |
 | `DJANGO_DEBUG` | `False` |
-| `DJANGO_PREVIEW` | `False` for production; set `True` only for a protected Render preview using Clerk test keys |
+| `DJANGO_PREVIEW` | `False` for production; set `True` only for a protected Render preview using a Supabase test project |
 | `DJANGO_ALLOWED_HOSTS` | Exact application hostnames, comma-separated |
 | `DJANGO_CSRF_TRUSTED_ORIGINS` | HTTPS origins for the Django site, comma-separated |
 | `SUPABASE_URL` | Supabase project URL |
 | `SUPABASE_ANON_KEY` | Supabase public anon/publishable key |
 | `SUPABASE_SERVICE_ROLE_KEY` | Server-only key for administrative Auth operations |
+| `SEED_SHOP_NAME` | Optional one-time shop name for `bootstrap_shop` |
+| `SEED_SHOP_CURRENCY` | Optional one-time currency for `bootstrap_shop` (defaults to `INR`) |
+| `SEED_ADMIN_SUPABASE_USER_ID` | Optional one-time Supabase user ID for the Admin seed command |
+| `SEED_ADMIN_EMAIL` | Optional one-time email for the Admin seed command |
+| `SEED_ADMIN_DISPLAY_NAME` | Optional one-time display name for the Admin seed command |
 | `DATABASE_URL` | Supabase PostgreSQL URL for the chosen connection mode |
 | `CACHE_URL` | Shared Redis URL (`rediss://` preferred) for production invitation/session caches |
 | `DB_CONN_MAX_AGE` | Persistent connection lifetime in seconds; use `0` for transaction pooling |
@@ -39,7 +44,7 @@ Set these values in the hosting provider's secret manager, not in source control
 2. Run `python manage.py check --deploy` with production environment variables.
 3. Run `python manage.py migrate` as a controlled release step against the production database.
 4. Run `python manage.py collectstatic --noinput` and serve static files through the selected host/CDN.
-5. Create the first Admin with `python manage.py bootstrap_shop` using the Clerk user ID and intended shop details. Keep that command and its output private; do not provision an Admin through an untrusted public endpoint.
+5. Create the first Admin with `python manage.py bootstrap_shop` using the Supabase Auth user ID and intended shop details. For an existing one-shop database, use `python manage.py seed_admin` to link or create the Admin membership. Keep the seed values only as long as needed and never store a password in environment variables.
 6. Sign in as the Admin, verify shop settings, and invite one Staff member with only the permissions needed for their work.
 
 ### Render web service
@@ -52,7 +57,7 @@ Configure the existing Render service with the repository root as its root direc
 | Start command | `python -m gunicorn config.wsgi:application --bind 0.0.0.0:$PORT` |
 | Health check path | `/health/` |
 
-Install requirements on every build: Gunicorn is the production WSGI server and must be installed before the start command runs. WhiteNoise serves the collected static files from the web process. The Django project module is `config`; use its existing WSGI application. Set all environment variables from section 2 in Render's environment settings, including `DJANGO_SECRET_KEY` (the app does not read `SECRET_KEY`). Keep `DJANGO_DEBUG=False`. For a temporary Render preview, set `DJANGO_PREVIEW=True` and use matching `pk_test_`/`sk_test_` Clerk keys; never use that setting for production.
+Install requirements on every build: Gunicorn is the production WSGI server and must be installed before the start command runs. WhiteNoise serves the collected static files from the web process. The Django project module is `config`; use its existing WSGI application. Set all environment variables from section 2 in Render's environment settings, including `DJANGO_SECRET_KEY` (the app does not read `SECRET_KEY`). Keep `DJANGO_DEBUG=False`. For a temporary Render preview, set `DJANGO_PREVIEW=True` and use a separate Supabase test project; never use that project for production.
 
 Run `python manage.py migrate --noinput` as the controlled release step before routing traffic to the new version. Arrange static file hosting for `staticfiles/` as required above; Gunicorn alone does not serve those assets. Keep the existing Supabase PostgreSQL and Redis services.
 
@@ -60,7 +65,7 @@ The failure notification for commit `9d11cfa64d4fcffdff58196bf57d21d1ac37104b` i
 
 ## 4. Verify the live setup
 
-- Confirm unauthenticated requests are redirected to Clerk sign-in and that invalid, expired, wrong-issuer, or wrong-origin sessions fail closed.
+- Confirm unauthenticated requests are redirected to sign-in and that invalid, expired, or wrong-issuer Supabase sessions fail closed.
 - Confirm Staff cannot access another member's receipts or shop-wide sales unless the relevant permission is granted. Confirm Admin-only pages reject Staff at the server.
 - Import a small sample CSV in a non-production environment first. Verify preview validation, duplicate SKU/IMEI rejection, opening movements, and no writes until confirmation.
 - Complete a controlled sale, service-only bill, used-phone intake, return, void, stock adjustment, and CSV import. Reconcile the resulting stock movements, payment records, and audit events.
@@ -78,9 +83,9 @@ The failure notification for commit `9d11cfa64d4fcffdff58196bf57d21d1ac37104b` i
 
 ## Current launch limitations
 
-- This repository does not choose or configure a hosting provider, domain, production Clerk tenant, or Supabase project. Those must be provisioned and verified for the selected environment.
+- This repository does not choose or configure a hosting provider, domain, or Supabase project. Those must be provisioned and verified for the selected environment.
 - Reports are operational summaries and require reconciliation against the shop's accounting and tax process before they are used for statutory reporting.
 - Audit history is available in the Admin UI and is append-only through normal application flows. It is not a tamper-proof external ledger; restrict database access and include the database in backup and retention controls.
-- Production requires a shared Redis cache so Clerk invitation/session-related cache behavior is consistent across workers. Set `CACHE_URL` to a TLS-protected Redis URL and monitor connectivity.
+- Production requires a shared Redis cache so session-verification cache behavior is consistent across workers. Set `CACHE_URL` to a TLS-protected Redis URL and monitor connectivity.
 - Configure rate limiting and edge protection at the selected host or proxy before public production traffic.
 - Production credentials and a hosting platform are not provisioned in this workspace. Code-level readiness checks can run here, but the live deployment checklist still needs to be completed in the selected hosting environment. Rotate any credentials previously pasted into chat before production use.

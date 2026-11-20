@@ -3,6 +3,7 @@ gunicorn>=23,<24
 dj-database-url>=2.3,<3
 psycopg[binary]>=3.2,<4
 PyJWT[crypto]>=2.10,<3
+certifi>=2025.1.31,<2027
 python-dotenv>=1.0,<2
 redis>=5,<7
 whitenoise>=6.9,<7

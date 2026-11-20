@@ -4,7 +4,7 @@
 
 **Audience:** One mobile phone shop, managed by an Admin and operated by Staff
 
-**Product:** Next, a server-rendered Django application with Clerk identity and Supabase PostgreSQL
+**Product:** Next, a server-rendered Django application with Supabase Auth and Supabase PostgreSQL
 
 ## 1. Purpose
 
@@ -15,8 +15,9 @@ Give a small mobile shop one beginner-friendly place to record sales, stock, sup
 - **Admin:** Manages the shop, staff access, settings, products, costs, reports, suppliers, expenses, and sales corrections.
 - **Staff:** Uses checkout and only the additional capabilities granted by the Admin.
 - Supabase Auth handles sign-in, sessions, invitations, and password recovery. Public registration and shared user accounts are not supported.
-- Protected pages initialize Clerk on page load so its session cookie refreshes in the background during navigation and form entry.
-- Django resolves the Clerk identity to an active shop membership and enforces every permission on the server. The MVP is isolated to one shop per deployment.
+- Existing legacy memberships are linked to Supabase on first sign-in only when the confirmed Supabase email matches one active membership.
+- Protected pages refresh the Django session cookie from the Supabase client session during navigation and form entry.
+- Django resolves the verified Supabase identity to an active shop membership and enforces every permission on the server. The MVP is isolated to one shop per deployment.
 
 ## 3. Product scope
 
@@ -54,7 +55,7 @@ Give a small mobile shop one beginner-friendly place to record sales, stock, sup
 
 ## 4. Core acceptance criteria
 
-- An unauthenticated or invalid Clerk session cannot access protected shop data.
+- An unauthenticated or invalid Supabase session cannot access protected shop data.
 - Staff permissions are checked on the server; one shop's supplier/product data cannot be selected by another shop.
 - A valid checkout posts one sale, payment, and matching stock movement in a database transaction. Retrying the same request does not duplicate them.
 - A return is linked to its original receipt and cannot exceed the unreturned quantity or paid amount.
@@ -67,8 +68,8 @@ Give a small mobile shop one beginner-friendly place to record sales, stock, sup
 - Backend and server-rendered UI: Python and Django templates.
 - Authentication: Supabase Auth; authorization and shop isolation: Django.
 - Production database: Supabase PostgreSQL over TLS, with Django ORM migrations as the schema source of truth.
-- Production requires `DEBUG=False`, a strong unique Django secret, exact hosts and HTTPS origins, live Clerk keys, PostgreSQL, and a shared Redis cache.
-- Hosted previews may use `DEBUG=False` with `DJANGO_PREVIEW=True` and Clerk test keys; production always requires live Clerk keys.
+- Production requires `DEBUG=False`, a strong unique Django secret, exact hosts and HTTPS origins, Supabase Auth keys, PostgreSQL, and a shared Redis cache.
+- Hosted previews may use `DEBUG=False` with `DJANGO_PREVIEW=True` and Supabase test-project keys.
 - Production operations require managed HTTPS, static file hosting, monitored errors, database backups, and a rehearsed restore process.
 - Deployment provider, production domain, Redis service, backup policy, and alerting provider are environment decisions and are not provisioned by this repository.
 

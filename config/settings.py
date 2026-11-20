@@ -97,6 +97,7 @@ if not DEBUG:
         "DATABASE_URL": database_url,
         "SUPABASE_URL": os.environ.get("SUPABASE_URL", "").strip(),
         "SUPABASE_ANON_KEY": os.environ.get("SUPABASE_ANON_KEY", "").strip(),
+        "SUPABASE_SERVICE_ROLE_KEY": os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip(),
         "DJANGO_CSRF_TRUSTED_ORIGINS": os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS", "").strip(),
         "CACHE_URL": os.environ.get("CACHE_URL", "").strip(),
     }
@@ -120,6 +121,7 @@ CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in os.environ.get("DJANGO_CSRF
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
 SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "").strip()
+# Used only by server-side Supabase Auth invitations. Never pass this to templates.
 SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()
 SUPABASE_JWKS_URL = os.environ.get("SUPABASE_JWKS_URL", "").strip() or (f"{SUPABASE_URL}/auth/v1/.well-known/jwks.json" if SUPABASE_URL else "")
 SUPABASE_ISSUER = os.environ.get("SUPABASE_ISSUER", "").strip() or (f"{SUPABASE_URL}/auth/v1" if SUPABASE_URL else "")

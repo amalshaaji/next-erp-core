@@ -23,7 +23,7 @@ from .services.supabase_api import SupabaseApiError, invite_user
 from .services.reporting import build_daily_financials, build_report, calculate_financials
 from .services.imports import preview_product_csv
 from .services.audit import record_event
-from .services.auth import verify_access_token
+from .services.auth import resolve_membership, verify_access_token
 
 
 CENT = Decimal("0.01")
@@ -42,11 +42,16 @@ def auth_session(request):
         return JsonResponse({"error": "POST required"}, status=405)
     token = request.POST.get("access_token", "").strip()
     try:
-        verify_access_token(token)
-    except Exception:
-        return JsonResponse({"error": "Invalid or expired session"}, status=401)
+        claims = verify_access_token(token)
+        membership = resolve_membership(claims["sub"], token)
+    except Exception as exc:
+        logger.warning("Supabase sign-in verification failed (%s).", type(exc).__name__)
+        return JsonResponse({"error": "Supabase could not verify this sign-in. Please try again."}, status=401)
+    if membership is None:
+        return JsonResponse({"error": "This confirmed email is not linked to shop access. Ask your Admin to invite it."}, status=403)
     response = JsonResponse({"ok": True})
-    response.set_cookie("supabase_access_token", token, max_age=3600, httponly=True, secure=not settings.DEBUG, samesite="Lax")
+    max_age = max(1, min(3600, int(claims["exp"] - timezone.now().timestamp())))
+    response.set_cookie("supabase_access_token", token, max_age=max_age, httponly=True, secure=not settings.DEBUG, samesite="Lax")
     return response
 
 
@@ -798,7 +803,7 @@ def stock_adjustments(request):
 
 
 def sign_out(request):
-    response = redirect("sign_in")
+    response = render(request, "shop/sign_out.html")
     response.delete_cookie("supabase_access_token")
     return response
 
@@ -822,14 +827,18 @@ def team(request):
                 else:
                     try:
                         result = invite_user(email, request.build_absolute_uri("/sign-in/"))
+                        invited_user = result.get("user", result)
+                        invitation_id = invited_user.get("id")
+                        if not invitation_id:
+                            raise SupabaseApiError("Supabase did not return an invitation ID.")
                         StaffInvitation.objects.create(
                             shop=shop,
                             email=email,
-                            clerk_invitation_id=result.get("id", result.get("user", {}).get("id", "")),
+                            supabase_user_id=invitation_id,
                             permissions={key: True for key in invite_form.cleaned_data["permissions"]},
                             created_by=request.membership,
                         )
-                        record_event(shop, request.membership, "access.staff_invited", "staff_invitation", result["id"], {"email": email, "permissions": invite_form.cleaned_data["permissions"]})
+                        record_event(shop, request.membership, "access.staff_invited", "staff_invitation", invitation_id, {"email": email, "permissions": invite_form.cleaned_data["permissions"]})
                         messages.success(request, f"Invitation sent to {email}. Their Staff access starts after they accept and sign in.")
                         return redirect("team")
                     except (SupabaseApiError, KeyError) as exc:

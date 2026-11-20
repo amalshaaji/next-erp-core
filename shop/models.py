@@ -23,7 +23,6 @@ class Membership(models.Model):
         STAFF = "staff", "Staff"
 
     shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name="memberships")
-    clerk_user_id = models.CharField(max_length=100, unique=True, blank=True)
     supabase_user_id = models.CharField(max_length=100, unique=True, null=True, blank=True)
     display_name = models.CharField(max_length=160, blank=True)
     email = models.EmailField(blank=True)
@@ -72,7 +71,7 @@ class Membership(models.Model):
         return self.can("voids")
 
     def __str__(self):
-        return self.display_name or self.email or self.supabase_user_id or self.clerk_user_id
+        return self.display_name or self.email or self.supabase_user_id
 
 
 class StaffInvitation(models.Model):
@@ -83,11 +82,9 @@ class StaffInvitation(models.Model):
 
     shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name="staff_invitations")
     email = models.EmailField()
-    clerk_invitation_id = models.CharField(max_length=100, unique=True, blank=True)
     supabase_user_id = models.CharField(max_length=100, blank=True)
     permissions = models.JSONField(default=dict, blank=True)
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
-    clerk_user_id = models.CharField(max_length=100, blank=True)
     created_by = models.ForeignKey(Membership, on_delete=models.PROTECT)
     created_at = models.DateTimeField(default=dj_timezone.now)
     accepted_at = models.DateTimeField(null=True, blank=True)

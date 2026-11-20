@@ -36,6 +36,23 @@
       {% block content %}{% endblock %}
     </main>
   </div>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    (() => {
+      const supabase = window.supabase.createClient('{{ supabase_url }}', '{{ supabase_anon_key }}');
+      async function syncSessionCookie(session) {
+        if (!session) return;
+        await fetch('{% url "auth_session" %}', {
+          method: 'POST',
+          body: new URLSearchParams({access_token: session.access_token}),
+        });
+      }
+      supabase.auth.getSession().then(({data}) => syncSessionCookie(data.session));
+      supabase.auth.onAuthStateChange((event, session) => {
+        if (event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN') syncSessionCookie(session);
+      });
+    })();
+  </script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

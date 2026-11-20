@@ -1,8 +1,138 @@
 {% load static %}
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Sign in · Next</title><link rel="icon" type="image/png" href="{% static 'shop/favicon.png' %}?v=27613e58122e"><link rel="stylesheet" href="{% static 'shop/shop.css' %}?v=20261120-8"></head>
-<body class="signin-page"><main class="signin-card"><a class="brand brand-centered" href="#"><img class="brand-logo" src="{% static 'shop/favicon.png' %}" width="36" height="36" alt=""><span>Next<small>Mobile shop ERP</small></span></a><div class="signin-copy"><h1>Welcome back</h1><p>Sign in to manage your shop.</p></div>
-<form id="sign-in-form" class="signin-form"><label for="email">Email<input id="email" type="email" autocomplete="username" placeholder="you@example.com" required></label><label for="password">Password<input id="password" type="password" autocomplete="current-password" placeholder="Enter your password" required></label><button class="button button-primary button-wide" type="submit">Sign in</button><p id="error" class="notice notice-warning" hidden></p></form></main>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script>
-const supabase = window.supabase.createClient('{{ supabase_url }}','{{ supabase_anon_key }}');
-document.getElementById('sign-in-form').addEventListener('submit', async (event) => { event.preventDefault(); const error = document.getElementById('error'); error.hidden = true; const {data, error: authError} = await supabase.auth.signInWithPassword({email: email.value, password: password.value}); if (authError) { error.textContent = authError.message; error.hidden = false; return; } const body = new URLSearchParams({access_token: data.session.access_token}); const response = await fetch('{% url "auth_session" %}', {method:'POST', body}); if (response.ok) window.location.href = '/'; else { error.textContent = 'Could not establish a secure session.'; error.hidden = false; } });
-</script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sign in · Next</title>
+  <link rel="icon" type="image/png" href="{% static 'shop/favicon.png' %}?v=27613e58122e">
+  <link rel="stylesheet" href="{% static 'shop/shop.css' %}?v=20261120-8">
+</head>
+<body class="signin-page">
+  <main class="signin-card">
+    <a class="brand brand-centered" href="#"><img class="brand-logo" src="{% static 'shop/favicon.png' %}" width="36" height="36" alt=""><span>Next<small>Mobile shop ERP</small></span></a>
+    <div class="signin-copy"><h1>Welcome back</h1><p>Sign in to manage your shop.</p></div>
+    <form id="sign-in-form" class="signin-form" method="post">
+      {% csrf_token %}
+      <label for="email">Email<input id="email" name="email" type="email" autocomplete="username" placeholder="you@example.com" required></label>
+      <label for="password">Password<input id="password" name="password" type="password" autocomplete="current-password" placeholder="Enter your password" required></label>
+      <button id="sign-in-button" class="button button-primary button-wide" type="submit" disabled>Sign in</button>
+      <button id="forgot-password" class="text-button" type="button" disabled>Forgot password?</button>
+      <p id="error" class="notice notice-warning" role="alert" hidden></p>
+    </form>
+    <p id="auth-load-error" class="notice notice-warning" role="alert" hidden>Sign-in could not load. Check your connection and refresh this page.</p>
+    <form id="password-reset-form" class="signin-form" hidden>
+      <label for="new-password">New password<input id="new-password" type="password" autocomplete="new-password" minlength="8" required></label>
+      <label for="confirm-password">Confirm new password<input id="confirm-password" type="password" autocomplete="new-password" minlength="8" required></label>
+      <button class="button button-primary button-wide" type="submit">Update password</button>
+      <p id="reset-error" class="notice notice-warning" role="alert" hidden></p>
+    </form>
+  </main>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" onerror="document.getElementById('auth-load-error').hidden = false"></script>
+  <script>
+    (() => {
+    const supabase = window.supabase.createClient('{{ supabase_url }}', '{{ supabase_anon_key }}');
+    const form = document.getElementById('sign-in-form');
+    const errorMessage = document.getElementById('error');
+    const button = document.getElementById('sign-in-button');
+    const resetForm = document.getElementById('password-reset-form');
+    const resetError = document.getElementById('reset-error');
+    const emailInput = document.getElementById('email');
+    button.disabled = false;
+    document.getElementById('forgot-password').disabled = false;
+
+    function showPasswordReset() {
+      form.hidden = true;
+      resetForm.hidden = false;
+      document.querySelector('.signin-copy h1').textContent = 'Reset your password';
+      document.querySelector('.signin-copy p').textContent = 'Choose a new password for your account.';
+    }
+
+    if (new URLSearchParams(window.location.hash.slice(1)).get('type') === 'recovery') {
+      showPasswordReset();
+    }
+
+    supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') showPasswordReset();
+    });
+
+    document.getElementById('forgot-password').addEventListener('click', async () => {
+      errorMessage.hidden = true;
+      if (!emailInput.reportValidity()) return;
+      const {error} = await supabase.auth.resetPasswordForEmail(emailInput.value, {
+        redirectTo: `${window.location.origin}/sign-in/`,
+      });
+      errorMessage.textContent = error ? error.message : 'If this email has an account, a password reset link is on its way.';
+      errorMessage.hidden = false;
+    });
+
+    resetForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      resetError.hidden = true;
+      const newPassword = document.getElementById('new-password').value;
+      if (newPassword !== document.getElementById('confirm-password').value) {
+        resetError.textContent = 'The passwords do not match.';
+        resetError.hidden = false;
+        return;
+      }
+      const {error} = await supabase.auth.updateUser({password: newPassword});
+      if (error) {
+        resetError.textContent = error.message;
+        resetError.hidden = false;
+        return;
+      }
+      await supabase.auth.signOut();
+      resetForm.hidden = true;
+      form.hidden = false;
+      document.querySelector('.signin-copy h1').textContent = 'Password updated';
+      document.querySelector('.signin-copy p').textContent = 'Sign in with your new password.';
+      errorMessage.textContent = 'Your password was updated.';
+      errorMessage.hidden = false;
+    });
+
+    async function establishDjangoSession(session) {
+      const body = new URLSearchParams({access_token: session.access_token});
+      const response = await fetch('{% url "auth_session" %}', {method: 'POST', body});
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Could not establish a secure session.');
+    }
+
+    const isRecovery = new URLSearchParams(window.location.hash.slice(1)).get('type') === 'recovery';
+    supabase.auth.getSession().then(async ({data, error}) => {
+      if (error) return;
+      if (data.session && !isRecovery) {
+        try {
+          await establishDjangoSession(data.session);
+          window.location.replace('/');
+        } catch (sessionError) {
+          await supabase.auth.signOut();
+          errorMessage.textContent = sessionError.message;
+          errorMessage.hidden = false;
+        }
+      }
+    });
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      errorMessage.hidden = true;
+      button.disabled = true;
+      button.textContent = 'Signing in…';
+      try {
+        const {data, error} = await supabase.auth.signInWithPassword({
+          email: document.getElementById('email').value,
+          password: document.getElementById('password').value,
+        });
+        if (error) throw error;
+        await establishDjangoSession(data.session);
+        window.location.replace('/');
+      } catch (signInError) {
+        errorMessage.textContent = signInError.message || 'Sign-in failed. Please try again.';
+        errorMessage.hidden = false;
+        button.disabled = false;
+        button.textContent = 'Sign in';
+      }
+    });
+    })();
+  </script>
+</body>
+</html>

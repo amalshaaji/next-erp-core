@@ -1,5 +1,4 @@
 import json
-import unittest
 import uuid
 from decimal import Decimal
 
@@ -88,7 +87,7 @@ class CheckoutIdempotencyTests(TestCase):
         self.shop = Shop.objects.create(name="Shop One")
         self.membership = Membership.objects.create(
             shop=self.shop,
-            clerk_user_id="user_test_admin",
+            supabase_user_id="user_test_admin",
             role=Membership.Role.ADMIN,
         )
         self.product = Product.objects.create(
@@ -243,7 +242,7 @@ class InventoryAndReturnIntegrityTests(TestCase):
         self.shop = Shop.objects.create(name="Shop One")
         self.membership = Membership.objects.create(
             shop=self.shop,
-            clerk_user_id="user_inventory_admin",
+            supabase_user_id="user_inventory_admin",
             role=Membership.Role.ADMIN,
         )
 
@@ -336,104 +335,3 @@ class InventoryAndReturnIntegrityTests(TestCase):
         self.assertEqual(SaleReturn.objects.filter(sale=sale).count(), 1)
         self.assertEqual(Payment.objects.filter(sale=sale, kind=Payment.Kind.REFUND).count(), 1)
         self.assertEqual(StockMovement.objects.filter(sale=sale, reason=StockMovement.Reason.RETURN).count(), 1)
-
-
-@unittest.skip("Legacy Clerk tests replaced by Supabase Auth integration tests")
-class ClerkSessionValidationTests(TestCase):
-    def setUp(self):
-        import base64
-        from cryptography.hazmat.primitives import serialization
-        from cryptography.hazmat.primitives.asymmetric import rsa
-
-        self.private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-        public_key = self.private_key.public_key().public_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PublicFormat.SubjectPublicKeyInfo,
-        )
-        self.encoded_public_key = base64.b64encode(public_key).decode("ascii")
-        self.shop = Shop.objects.create(name="Auth shop")
-        self.membership = Membership.objects.create(
-            shop=self.shop,
-            clerk_user_id="user_verified_session",
-            role=Membership.Role.ADMIN,
-        )
-
-    def _request_with_claims(self, claims, signing_key=None):
-        import jwt
-        from django.test import override_settings
-        from django.http import HttpResponse
-        from .middleware import ClerkShopMiddleware
-
-        token = jwt.encode(claims, signing_key or self.private_key, algorithm="RS256")
-        request = RequestFactory().get("/products/")
-        request.COOKIES["__session"] = token
-        config = override_settings(
-            CLERK_JWT_PUBLIC_KEY_BASE64=self.encoded_public_key,
-            CLERK_JWKS_URL="",
-            CLERK_ISSUER="https://clerk.example.test",
-            CLERK_AUTHORIZED_PARTIES=["https://shop.example.test"],
-        )
-        config.enable()
-        try:
-            middleware = ClerkShopMiddleware(lambda request: HttpResponse("verified"))
-            return middleware(request)
-        finally:
-            config.disable()
-
-    def test_invalid_issuer_and_authorized_party_fail_closed(self):
-        import time
-        import jwt
-
-        base = {"sub": self.membership.clerk_user_id, "iss": "https://clerk.example.test", "exp": int(time.time()) + 300, "azp": "https://shop.example.test"}
-        wrong_issuer = {**base, "iss": "https://attacker.example.test"}
-        wrong_origin = {**base, "azp": "https://attacker.example.test"}
-        expired = {**base, "exp": int(time.time()) - 1}
-        for claims in (wrong_issuer, wrong_origin, expired):
-            with self.subTest(claims=claims):
-                response = self._request_with_claims(claims)
-                self.assertEqual(response.status_code, 302)
-                self.assertEqual(response.url, "/sign-in/")
-
-        wrong_key = jwt.encode(base, "not-an-rsa-private-key-but-long-enough-32-bytes", algorithm="HS256")
-        from django.test import override_settings
-        from django.http import HttpResponse
-        from .middleware import ClerkShopMiddleware
-        config = override_settings(
-            CLERK_JWT_PUBLIC_KEY_BASE64=self.encoded_public_key,
-            CLERK_JWKS_URL="",
-            CLERK_ISSUER="https://clerk.example.test",
-            CLERK_AUTHORIZED_PARTIES=["https://shop.example.test"],
-        )
-        config.enable()
-        try:
-            request = RequestFactory().get("/products/")
-            request.COOKIES["__session"] = wrong_key
-            response = ClerkShopMiddleware(lambda request: HttpResponse("verified"))(request)
-        finally:
-            config.disable()
-        self.assertEqual(response.status_code, 302)
-
-    def test_verified_session_resolves_active_shop_membership(self):
-        import time
-        import jwt
-        from django.test import override_settings
-        from django.http import HttpResponse
-        from .middleware import ClerkShopMiddleware
-
-        claims = {"sub": self.membership.clerk_user_id, "iss": "https://clerk.example.test", "exp": int(time.time()) + 300, "azp": "https://shop.example.test", "sid": "sess_production_test"}
-        token = jwt.encode(claims, self.private_key, algorithm="RS256")
-        config = override_settings(
-            CLERK_JWT_PUBLIC_KEY_BASE64=self.encoded_public_key,
-            CLERK_JWKS_URL="",
-            CLERK_ISSUER="https://clerk.example.test",
-            CLERK_AUTHORIZED_PARTIES=["https://shop.example.test"],
-        )
-        config.enable()
-        try:
-            request = RequestFactory().get("/products/")
-            request.COOKIES["__session"] = token
-            response = ClerkShopMiddleware(lambda request: HttpResponse("verified"))(request)
-        finally:
-            config.disable()
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(request.membership.pk, self.membership.pk)

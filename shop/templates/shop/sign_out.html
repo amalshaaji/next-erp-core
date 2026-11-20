@@ -1,2 +1,20 @@
 {% load static %}
-<!doctype html><html><head><meta http-equiv="refresh" content="0;url=/sign-in/"><link rel="icon" type="image/png" href="{% static 'shop/favicon.png' %}?v=27613e58122e"></head><body>Signing out… <a href="/sign-in/">Continue</a></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Signing out · Next</title>
+  <link rel="icon" type="image/png" href="{% static 'shop/favicon.png' %}?v=27613e58122e">
+</head>
+<body>
+  <p>Signing out… <a href="/sign-in/">Continue to sign in</a></p>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    (() => {
+    const supabase = window.supabase.createClient('{{ supabase_url }}', '{{ supabase_anon_key }}');
+    supabase.auth.signOut().finally(() => window.location.replace('/sign-in/'));
+    })();
+  </script>
+</body>
+</html>
