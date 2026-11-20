@@ -3,6 +3,7 @@ import uuid
 import csv
 import secrets
 import logging
+from django.conf import settings
 from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
@@ -10,17 +11,19 @@ from django.contrib import messages
 from django.core.cache import cache
 from django.db import IntegrityError, connection, transaction
 from django.db.models import Count, Exists, Max, Min, OuterRef, Prefetch, Sum
-from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseForbidden
+from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseForbidden, JsonResponse
+from django.views.decorators.csrf import csrf_exempt
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from .decorators import permission_required
 from .forms import ExpenseForm, ExpenseReversalForm, STAFF_PERMISSION_OPTIONS, ProductForm, ProductImportForm, QuantityStocktakeForm, ShopSettingsForm, StaffInviteForm, StaffPermissionsForm, StockReceiveForm, SupplierForm
 from .models import AuditEvent, Device, Expense, ImportBatch, Membership, Payment, Product, Purchase, ReturnLine, Sale, SaleLine, SaleReturn, SaleVoid, Shop, StaffInvitation, StockMovement, Supplier
-from .services.clerk_api import ClerkApiError, clerk_request
+from .services.supabase_api import SupabaseApiError, invite_user
 from .services.reporting import build_daily_financials, build_report, calculate_financials
 from .services.imports import preview_product_csv
 from .services.audit import record_event
+from .services.auth import verify_access_token
 
 
 CENT = Decimal("0.01")
@@ -31,6 +34,20 @@ def sign_in(request):
     if request.membership:
         return redirect("dashboard")
     return render(request, "shop/sign_in.html")
+
+
+@csrf_exempt
+def auth_session(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    token = request.POST.get("access_token", "").strip()
+    try:
+        verify_access_token(token)
+    except Exception:
+        return JsonResponse({"error": "Invalid or expired session"}, status=401)
+    response = JsonResponse({"ok": True})
+    response.set_cookie("supabase_access_token", token, max_age=3600, httponly=True, secure=not settings.DEBUG, samesite="Lax")
+    return response
 
 
 def health(request):
@@ -781,7 +798,9 @@ def stock_adjustments(request):
 
 
 def sign_out(request):
-    return render(request, "shop/sign_out.html")
+    response = redirect("sign_in")
+    response.delete_cookie("supabase_access_token")
+    return response
 
 
 def team(request):
@@ -802,24 +821,19 @@ def team(request):
                     invite_form.add_error("email", "An invitation is already pending for this email.")
                 else:
                     try:
-                        result = clerk_request("invitations", method="POST", payload={
-                            "email_address": email,
-                            "redirect_url": request.build_absolute_uri("/sign-in/"),
-                            "notify": True,
-                            "public_metadata": {"shop_id": shop.pk, "product": "mobile-shop-erp"},
-                        })
+                        result = invite_user(email, request.build_absolute_uri("/sign-in/"))
                         StaffInvitation.objects.create(
                             shop=shop,
                             email=email,
-                            clerk_invitation_id=result["id"],
+                            clerk_invitation_id=result.get("id", result.get("user", {}).get("id", "")),
                             permissions={key: True for key in invite_form.cleaned_data["permissions"]},
                             created_by=request.membership,
                         )
                         record_event(shop, request.membership, "access.staff_invited", "staff_invitation", result["id"], {"email": email, "permissions": invite_form.cleaned_data["permissions"]})
                         messages.success(request, f"Invitation sent to {email}. Their Staff access starts after they accept and sign in.")
                         return redirect("team")
-                    except (ClerkApiError, KeyError) as exc:
-                        messages.error(request, str(exc) or "Clerk did not return an invitation ID.")
+                    except (SupabaseApiError, KeyError) as exc:
+                        messages.error(request, str(exc) or "Supabase did not return an invitation ID.")
         elif action == "permissions":
             member = get_object_or_404(Membership, pk=request.POST.get("member_id"), shop=shop, role=Membership.Role.STAFF)
             form = StaffPermissionsForm(request.POST)
@@ -840,13 +854,12 @@ def team(request):
         elif action == "revoke":
             invitation = get_object_or_404(StaffInvitation, pk=request.POST.get("invitation_id"), shop=shop, status=StaffInvitation.Status.PENDING)
             try:
-                clerk_request(f"invitations/{invitation.clerk_invitation_id}/revoke", method="POST", payload={})
                 invitation.status = StaffInvitation.Status.REVOKED
                 invitation.save(update_fields=["status"])
                 record_event(shop, request.membership, "access.invitation_revoked", "staff_invitation", invitation.pk, {"email": invitation.email})
                 messages.success(request, f"Invitation for {invitation.email} was revoked.")
                 return redirect("team")
-            except ClerkApiError as exc:
+            except SupabaseApiError as exc:
                 messages.error(request, str(exc))
     memberships = Membership.objects.filter(shop=shop).order_by("role", "email")
     invitations = StaffInvitation.objects.filter(shop=shop).order_by("-created_at")[:30]

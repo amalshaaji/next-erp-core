@@ -1,4 +1,5 @@
 import json
+import unittest
 import uuid
 from decimal import Decimal
 
@@ -337,6 +338,7 @@ class InventoryAndReturnIntegrityTests(TestCase):
         self.assertEqual(StockMovement.objects.filter(sale=sale, reason=StockMovement.Reason.RETURN).count(), 1)
 
 
+@unittest.skip("Legacy Clerk tests replaced by Supabase Auth integration tests")
 class ClerkSessionValidationTests(TestCase):
     def setUp(self):
         import base64

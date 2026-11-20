@@ -34,7 +34,7 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
-    "shop.middleware.ClerkShopMiddleware",
+    "shop.middleware.SupabaseShopMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -95,30 +95,20 @@ if not DEBUG:
         raise RuntimeError("Set DJANGO_ALLOWED_HOSTS to exact production hostnames; wildcards are not allowed.")
     required_production_settings = {
         "DATABASE_URL": database_url,
-        "CLERK_PUBLISHABLE_KEY": os.environ.get("CLERK_PUBLISHABLE_KEY", "").strip(),
-        "CLERK_SECRET_KEY": os.environ.get("CLERK_SECRET_KEY", "").strip(),
-        "CLERK_FRONTEND_API_URL": os.environ.get("CLERK_FRONTEND_API_URL", "").strip(),
-        "CLERK_AUTHORIZED_PARTIES": os.environ.get("CLERK_AUTHORIZED_PARTIES", "").strip(),
+        "SUPABASE_URL": os.environ.get("SUPABASE_URL", "").strip(),
+        "SUPABASE_ANON_KEY": os.environ.get("SUPABASE_ANON_KEY", "").strip(),
         "DJANGO_CSRF_TRUSTED_ORIGINS": os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS", "").strip(),
         "CACHE_URL": os.environ.get("CACHE_URL", "").strip(),
     }
     missing_production_settings = [name for name, value in required_production_settings.items() if not value]
     if missing_production_settings:
         raise RuntimeError("Missing required production settings: " + ", ".join(missing_production_settings))
-    authorized_parties = [origin.strip() for origin in required_production_settings["CLERK_AUTHORIZED_PARTIES"].split(",")]
-    if any(not origin.startswith("https://") for origin in authorized_parties):
-        raise RuntimeError("Production CLERK_AUTHORIZED_PARTIES values must use HTTPS origins.")
     if any(not origin.strip().startswith("https://") for origin in required_production_settings["DJANGO_CSRF_TRUSTED_ORIGINS"].split(",")):
         raise RuntimeError("Production DJANGO_CSRF_TRUSTED_ORIGINS values must use HTTPS origins.")
     if not database_url.startswith(("postgres://", "postgresql://")):
         raise RuntimeError("Production DATABASE_URL must point to PostgreSQL.")
-    publishable_prefix = "pk_test_" if PREVIEW else "pk_live_"
-    secret_prefix = "sk_test_" if PREVIEW else "sk_live_"
-    environment_name = "preview" if PREVIEW else "production"
-    if not required_production_settings["CLERK_PUBLISHABLE_KEY"].startswith(publishable_prefix):
-        raise RuntimeError(f"{environment_name.title()} requires a {publishable_prefix} Clerk publishable key.")
-    if not required_production_settings["CLERK_SECRET_KEY"].startswith(secret_prefix):
-        raise RuntimeError(f"{environment_name.title()} requires a {secret_prefix} Clerk secret key.")
+    if not required_production_settings["SUPABASE_URL"].startswith("https://"):
+        raise RuntimeError("SUPABASE_URL must use HTTPS.")
     if not required_production_settings["CACHE_URL"].startswith(("redis://", "rediss://")):
         raise RuntimeError("Production CACHE_URL must use redis:// or rediss://.")
     SECURE_HSTS_SECONDS = 15_552_000
@@ -128,13 +118,11 @@ if not DEBUG:
         raise RuntimeError("DJANGO_HSTS_PRELOAD requires DJANGO_HSTS_INCLUDE_SUBDOMAINS=True.")
 CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",") if origin.strip()]
 
-CLERK_PUBLISHABLE_KEY = os.environ.get("CLERK_PUBLISHABLE_KEY", "")
-CLERK_SECRET_KEY = os.environ.get("CLERK_SECRET_KEY", "")
-CLERK_FRONTEND_API_URL = os.environ.get("CLERK_FRONTEND_API_URL", "").removeprefix("https://").rstrip("/")
-CLERK_JWKS_URL = os.environ.get("CLERK_JWKS_URL", "").strip() or (f"https://{CLERK_FRONTEND_API_URL}/.well-known/jwks.json" if CLERK_FRONTEND_API_URL else "")
-CLERK_ISSUER = os.environ.get("CLERK_ISSUER", "").strip() or (f"https://{CLERK_FRONTEND_API_URL}" if CLERK_FRONTEND_API_URL else "")
-CLERK_AUTHORIZED_PARTIES = [p.strip() for p in os.environ.get("CLERK_AUTHORIZED_PARTIES", "").split(",") if p.strip()]
-CLERK_JWT_PUBLIC_KEY_BASE64 = os.environ.get("CLERK_JWT_PUBLIC_KEY_BASE64", "").strip()
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
+SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "").strip()
+SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()
+SUPABASE_JWKS_URL = os.environ.get("SUPABASE_JWKS_URL", "").strip() or (f"{SUPABASE_URL}/auth/v1/.well-known/jwks.json" if SUPABASE_URL else "")
+SUPABASE_ISSUER = os.environ.get("SUPABASE_ISSUER", "").strip() or (f"{SUPABASE_URL}/auth/v1" if SUPABASE_URL else "")
 
 cache_url = os.environ.get("CACHE_URL", "").strip()
 if cache_url:

@@ -20,10 +20,9 @@ Set these values in the hosting provider's secret manager, not in source control
 | `DJANGO_PREVIEW` | `False` for production; set `True` only for a protected Render preview using Clerk test keys |
 | `DJANGO_ALLOWED_HOSTS` | Exact application hostnames, comma-separated |
 | `DJANGO_CSRF_TRUSTED_ORIGINS` | HTTPS origins for the Django site, comma-separated |
-| `CLERK_PUBLISHABLE_KEY` | Production Clerk publishable key |
-| `CLERK_SECRET_KEY` | Production Clerk secret key |
-| `CLERK_FRONTEND_API_URL` | Production Clerk Frontend API hostname |
-| `CLERK_AUTHORIZED_PARTIES` | Exact HTTPS origin(s) allowed to create Clerk sessions |
+| `SUPABASE_URL` | Supabase project URL |
+| `SUPABASE_ANON_KEY` | Supabase public anon/publishable key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Server-only key for administrative Auth operations |
 | `DATABASE_URL` | Supabase PostgreSQL URL for the chosen connection mode |
 | `CACHE_URL` | Shared Redis URL (`rediss://` preferred) for production invitation/session caches |
 | `DB_CONN_MAX_AGE` | Persistent connection lifetime in seconds; use `0` for transaction pooling |
@@ -32,7 +31,7 @@ Set these values in the hosting provider's secret manager, not in source control
 | `DJANGO_HSTS_PRELOAD` | Enable only after an explicit domain/preload review; requires include-subdomains |
 | `CACHE_KEY_PREFIX` | Unique prefix when sharing a Redis instance across environments |
 
-`CLERK_ISSUER` and `CLERK_JWKS_URL` can be left blank when they can be derived from `CLERK_FRONTEND_API_URL`. Never put the Clerk secret, database URL, or Django secret in templates or JavaScript.
+`SUPABASE_ISSUER` and `SUPABASE_JWKS_URL` can be left blank; they are derived from `SUPABASE_URL`. Never put the service-role key, database URL, or Django secret in templates or JavaScript.
 
 ## 3. Deploy and bootstrap
 

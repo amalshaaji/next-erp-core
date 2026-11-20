@@ -14,7 +14,7 @@ Give a small mobile shop one beginner-friendly place to record sales, stock, sup
 
 - **Admin:** Manages the shop, staff access, settings, products, costs, reports, suppliers, expenses, and sales corrections.
 - **Staff:** Uses checkout and only the additional capabilities granted by the Admin.
-- Clerk handles sign-in, sessions, invitations, and password recovery. Public registration and shared user accounts are not supported.
+- Supabase Auth handles sign-in, sessions, invitations, and password recovery. Public registration and shared user accounts are not supported.
 - Protected pages initialize Clerk on page load so its session cookie refreshes in the background during navigation and form entry.
 - Django resolves the Clerk identity to an active shop membership and enforces every permission on the server. The MVP is isolated to one shop per deployment.
 
@@ -65,7 +65,7 @@ Give a small mobile shop one beginner-friendly place to record sales, stock, sup
 ## 5. Technical and operational requirements
 
 - Backend and server-rendered UI: Python and Django templates.
-- Authentication: Clerk; authorization and shop isolation: Django.
+- Authentication: Supabase Auth; authorization and shop isolation: Django.
 - Production database: Supabase PostgreSQL over TLS, with Django ORM migrations as the schema source of truth.
 - Production requires `DEBUG=False`, a strong unique Django secret, exact hosts and HTTPS origins, live Clerk keys, PostgreSQL, and a shared Redis cache.
 - Hosted previews may use `DEBUG=False` with `DJANGO_PREVIEW=True` and Clerk test keys; production always requires live Clerk keys.
