@@ -14,7 +14,7 @@ Give a small mobile shop one beginner-friendly place to record sales, stock, sup
 
 - **Admin:** Manages the shop, staff access, settings, products, costs, reports, suppliers, expenses, and sales corrections.
 - **Staff:** Uses checkout and only the additional capabilities granted by the Admin.
-- Supabase Auth handles sign-in, sessions, invitations, and password recovery. Public registration and shared user accounts are not supported.
+- Supabase Auth handles sign-in, sessions, Admin-created Staff accounts, and password recovery. Admins create each Staff account with an email and temporary password, then share the password directly with that person. The app does not email invitations. Public registration and shared user accounts are not supported.
 - Existing legacy memberships are linked to Supabase on first sign-in only when the confirmed Supabase email matches one active membership.
 - Protected pages refresh the Django session cookie from the Supabase client session during navigation and form entry.
 - Django resolves the verified Supabase identity to an active shop membership and enforces every permission on the server. The MVP is isolated to one shop per deployment.
@@ -28,12 +28,12 @@ Give a small mobile shop one beginner-friendly place to record sales, stock, sup
 - Services can be billed in POS without changing stock.
 - The existing serialized-device model supports previously recorded/imported IMEI inventory and checkout. The current Add Product form creates quantity-tracked products.
 - Stock receives, opening quantities, sales, returns, voids, and count corrections are represented by stock movements. Posted movements are not silently overwritten.
-- Inventory header actions are Import CSV and Add product; Receive stock is accessed from Suppliers & purchases.
+- The Inventory header offers Add product; Receive stock is accessed from Suppliers & purchases.
 - Supplier selection is shop-scoped. Supplier records show assigned products, summarized receipt activity, and the date added from their creation audit record. Older records without that event display “Not recorded”.
 
 ### Checkout and receipts
 
-- Staff can find products and services, prepare a bill, choose a tender, and post a receipt.
+- Staff can find products and services, prepare a bill, choose cash, UPI, card, bank transfer, or another tender, and post a receipt.
 - Prices, tax, totals, and receipt snapshots are calculated on the server with decimal arithmetic.
 - Printed bills use a compact thermal receipt layout and follow the paper size selected in the printer settings.
 - A repeated checkout submission with the same request key returns the original receipt instead of posting a second sale, payment, or stock movement.
@@ -41,7 +41,7 @@ Give a small mobile shop one beginner-friendly place to record sales, stock, sup
 
 ### Returns, corrections, and expenses
 
-- Returns reference the original sale, record a reason and disposition, create a linked refund, and restore stock only when returned as sellable.
+- Returns reference the original sale, record a reason and disposition, create a linked refund, and restore stock only when returned as sellable. Sellable stock is the default disposition; staff can choose inspection or damaged/write-off when needed.
 - Voids and expense corrections create linked reversal records.
 - Shop expenses reduce estimated profit for their recorded date.
 
@@ -57,6 +57,7 @@ Give a small mobile shop one beginner-friendly place to record sales, stock, sup
 ## 4. Core acceptance criteria
 
 - An unauthenticated or invalid Supabase session cannot access protected shop data.
+- Only an Admin can create Staff Auth accounts; the temporary password is sent only to Supabase Auth over TLS and is never stored in application data or logs.
 - Staff permissions are checked on the server; one shop's supplier/product data cannot be selected by another shop.
 - A valid checkout posts one sale, payment, and matching stock movement in a database transaction. Retrying the same request does not duplicate them.
 - A return is linked to its original receipt and cannot exceed the unreturned quantity or paid amount.

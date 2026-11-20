@@ -25,21 +25,21 @@
         <div>
           <p class="bill-kicker">SALES RECEIPT</p>
           <h1 id="bill-shop-name">{{ sale.shop_name_snapshot|default:sale.shop.name }}</h1>
-          <p class="bill-tagline">Mobile shop</p>
+          <p class="bill-address">Panoor, Pallimukku, Alappuzha</p>
         </div>
       </div>
       <div class="bill-reference">
         <span>Receipt number</span>
         <strong>{{ sale.receipt_number }}</strong>
         <small>{{ sale.created_at|date:"d M Y · g:i A" }}</small>
-        {% if sale.void_record %}<span class="bill-status is-void">Voided</span>{% else %}<span class="bill-status">Paid</span>{% endif %}
+        {% if sale.void_record %}<span class="bill-status is-void">Voided</span>{% else %}<span class="bill-status">Paid{% if payment_method %} via {{ payment_method }}{% endif %}</span>{% endif %}
       </div>
     </header>
 
     <section class="bill-parties" aria-label="Sale details">
       <div><span>Customer</span><strong>{{ sale.customer_name|default:"Walk-in customer" }}</strong></div>
       <div><span>Served by</span><strong>{{ sale.cashier.display_name|default:sale.cashier.email|default:"Shop staff" }}</strong></div>
-      <div><span>Currency</span><strong>{{ sale.currency }}</strong></div>
+      <div class="bill-currency"><span>Currency</span><strong>{{ sale.currency }}</strong></div>
     </section>
 
     <div class="bill-table-wrap">
@@ -76,8 +76,7 @@
     </section>
 
     <footer class="bill-footer">
-      {% if sale.receipt_footer_snapshot %}<p>{{ sale.receipt_footer_snapshot }}</p>{% endif %}
-      <strong>Thank you for your purchase.</strong>
+      {% if sale.receipt_footer_snapshot %}<strong>{{ sale.receipt_footer_snapshot }}</strong>{% else %}<strong>Thank you for your purchase.</strong>{% endif %}
       <small>Please keep this bill for your records.</small>
     </footer>
   </article>

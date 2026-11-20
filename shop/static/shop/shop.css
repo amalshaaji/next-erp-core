@@ -19,6 +19,7 @@
 .bill-kicker{margin:0 0 5px;color:var(--green);font-size:10px;font-weight:800;letter-spacing:.16em}
 .bill-brand h1{font-size:clamp(1.45rem,2.5vw,2rem);margin:0;letter-spacing:-.04em}
 .bill-tagline{margin:5px 0 0;font-size:12px}
+.bill-address{margin:3px 0 0;font-size:11px;color:var(--muted)}
 .bill-reference{text-align:right;display:grid;justify-items:end;gap:4px;flex:0 0 auto}
 .bill-reference>span:first-child{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;font-weight:700}
 .bill-reference>strong{font:800 16px 'Manrope','DM Sans',sans-serif;letter-spacing:.02em}
@@ -32,6 +33,7 @@
 .bill-parties>div{display:grid;align-content:start;gap:5px;padding:13px 15px;background:#f7faf8;border:1px solid #edf1ee;border-radius:9px;min-width:0}
 .bill-parties span{color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.08em;font-weight:700}
 .bill-parties strong{font-size:12px;overflow-wrap:anywhere}
+.bill-currency{justify-items:end;text-align:right}
 .bill-table-wrap{overflow-x:auto}
 .bill-items{width:100%;border-collapse:collapse;white-space:normal;font-variant-numeric:tabular-nums}
 .bill-items thead{display:table-header-group}
@@ -162,7 +164,7 @@
 @media(max-width:720px){.supplier-info-grid{gap:8px}.supplier-card{padding:12px}.supplier-product-section table{min-width:540px}}
 
 .brand-logo{display:block;width:36px;height:36px;flex:0 0 36px;object-fit:contain}
-.signin-form{display:grid;gap:15px}.signin-form label{display:grid;gap:6px;color:#35483e;font-size:12px;font-weight:700}.signin-form input{width:100%;border:1px solid #dce5df;background:#fff;color:var(--ink);border-radius:8px;padding:11px;outline:none;transition:.15s}.signin-form input::placeholder{color:#a2ada6}.signin-form input:focus{border-color:#53a485;box-shadow:0 0 0 3px #e2f3eb}.signin-form .button{margin-top:3px}
+.signin-form{display:grid;gap:15px}.signin-form[hidden]{display:none}.signin-form label{display:grid;gap:6px;color:#35483e;font-size:12px;font-weight:700}.signin-form input{width:100%;border:1px solid #dce5df;background:#fff;color:var(--ink);border-radius:8px;padding:11px;outline:none;transition:.15s}.signin-form input::placeholder{color:#a2ada6}.signin-form input:focus{border-color:#53a485;box-shadow:0 0 0 3px #e2f3eb}.signin-form .button{margin-top:3px}
 .signin-form label+label{margin-top:1px}.signin-form .notice{margin:0}
 
 /* Minimal receipt detail and item table. */

@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Next{% endblock %} · Next</title>
   <link rel="icon" type="image/png" href="{% static 'shop/favicon.png' %}?v=27613e58122e">
-  <link rel="stylesheet" href="{% static 'shop/shop.css' %}?v=20261120-15">
+  <link rel="stylesheet" href="{% static 'shop/shop.css' %}?v=20261121-3">
   <link rel="stylesheet" href="{% static 'shop/reference-theme.css' %}?v=20261120-4">
 </head>
 <body>
@@ -25,7 +25,7 @@
           {% if request.membership.can_receive_purchases %}<a href="{% url 'suppliers' %}">Suppliers & purchases</a>{% endif %}
           {% if request.membership.can_expenses %}<a href="{% url 'expenses' %}">Shop expenses</a>{% endif %}
           {% if request.membership.can_refunds %}<a href="{% url 'returns' %}">Returns & refunds</a>{% endif %}
-          {% if request.membership.role == 'admin' %}<a href="{% url 'team' %}">Staff & permissions</a><a href="{% url 'shop_settings' %}">Shop settings</a>{% endif %}
+          {% if request.membership.role == 'admin' %}<a href="{% url 'team' %}">Team access</a><a href="{% url 'shop_settings' %}">Shop settings</a>{% endif %}
         </div></details>{% endif %}
       </nav>
       {% endwith %}

@@ -4,19 +4,32 @@ from .models import Expense, Product, Shop, Supplier
 
 
 class ProductForm(forms.ModelForm):
-    OPENING_STOCK_HELP = "Enter the starting number of pieces."
-
     class Meta:
         model = Product
         fields = ["name", "sku", "category", "brand_model", "supplier", "kind", "is_second_hand", "price", "cost", "reorder_level"]
-        labels = {"reorder_level": "Reorder level (pieces)"}
-        help_texts = {
-            "reorder_level": "Alert when stock reaches this number of pieces.",
+        labels = {
+            "sku": "SKU",
+            "brand_model": "Model",
+            "kind": "Type",
+            "is_second_hand": "Second-hand",
+            "price": "Selling price",
+            "cost": "Buying price",
+            "reorder_level": "Low-stock alert (pieces)",
         }
-        widgets = {"price": forms.NumberInput(attrs={"step": "0.01"}), "cost": forms.NumberInput(attrs={"step": "0.01"})}
+        help_texts = {
+            "reorder_level": "Show an alert when stock reaches this quantity.",
+        }
+        widgets = {
+            "price": forms.NumberInput(attrs={"step": "0.01", "placeholder": "0"}),
+            "cost": forms.NumberInput(attrs={"step": "0.01", "placeholder": "0"}),
+            "reorder_level": forms.NumberInput(attrs={"min": "0", "step": "1", "placeholder": "0"}),
+        }
 
     def __init__(self, *args, shop, **kwargs):
         super().__init__(*args, **kwargs)
+        for field_name in ("price", "cost", "reorder_level"):
+            self.fields[field_name].initial = None
+        self.fields["reorder_level"].required = False
         self.fields["supplier"].queryset = Supplier.objects.filter(shop=shop, is_active=True)
         self.fields["supplier"].required = False
         self.fields["supplier"].empty_label = "Choose a saved supplier (optional)"
@@ -29,10 +42,10 @@ class ProductForm(forms.ModelForm):
         self.fields["opening_quantity"] = forms.IntegerField(
             min_value=0,
             required=False,
-            initial=0,
-            label="Pieces in stock",
-            help_text=self.OPENING_STOCK_HELP,
-            widget=forms.NumberInput(attrs={"min": "0", "step": "1", "value": "0"}),
+            initial=None,
+            label="Opening stock (pieces)",
+            help_text="Starting quantity for this item.",
+            widget=forms.NumberInput(attrs={"min": "0", "step": "1", "placeholder": "0"}),
         )
 
     def clean(self):
@@ -41,6 +54,7 @@ class ProductForm(forms.ModelForm):
             data["tracking"] = Product.Tracking.QUANTITY
             data["is_second_hand"] = False
         data["tracking"] = Product.Tracking.QUANTITY
+        data["reorder_level"] = data.get("reorder_level") or 0
         opening_quantity = data.get("opening_quantity") or 0
         if data.get("kind") == Product.Kind.SERVICE and opening_quantity:
             self.add_error("opening_quantity", "Services do not have stock pieces.")
@@ -51,7 +65,7 @@ class StockReceiveForm(forms.Form):
     supplier = forms.ModelChoiceField(queryset=Supplier.objects.none(), required=False, empty_label="Cash purchase / supplier not listed", label="Supplier")
     product = forms.ModelChoiceField(queryset=Product.objects.none(), label="Product")
     quantity = forms.IntegerField(min_value=1, initial=1, label="Quantity received (pieces)")
-    unit_cost = forms.DecimalField(max_digits=12, decimal_places=2, min_value=0, required=False, label="Cost per phone / piece")
+    unit_cost = forms.DecimalField(max_digits=12, decimal_places=2, min_value=0, required=False, label="Buying price per phone / piece")
     reference = forms.CharField(max_length=80, required=False, label="Purchase reference")
     imeis = forms.CharField(required=False, widget=forms.Textarea(attrs={"rows": 4}), label="IMEI / serial numbers", help_text="For a serialized phone, enter one IMEI or serial per line.")
     is_second_hand = forms.BooleanField(required=False, label="These are second-hand phones")
@@ -104,9 +118,27 @@ STAFF_PERMISSION_OPTIONS = [
 ]
 
 
-class StaffInviteForm(forms.Form):
+class StaffAccountForm(forms.Form):
     email = forms.EmailField(label="Staff email")
+    password = forms.CharField(
+        label="Temporary password",
+        min_length=8,
+        widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}, render_value=False),
+        help_text="Give this password to the staff member and ask them to change it after signing in.",
+    )
+    confirm_password = forms.CharField(
+        label="Confirm password",
+        widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}, render_value=False),
+    )
     permissions = forms.MultipleChoiceField(choices=STAFF_PERMISSION_OPTIONS, required=False, widget=forms.CheckboxSelectMultiple, label="Extra access")
+
+    def clean(self):
+        data = super().clean()
+        password = data.get("password")
+        confirm_password = data.get("confirm_password")
+        if password and confirm_password and password != confirm_password:
+            self.add_error("confirm_password", "The passwords do not match.")
+        return data
 
 
 class StaffPermissionsForm(forms.Form):

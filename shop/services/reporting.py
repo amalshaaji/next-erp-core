@@ -225,7 +225,7 @@ def build_report(shop, start_date, end_date):
         tender_totals[row["tender"]]["received"] += row["total"] or Decimal("0")
     for row in refunded_rows:
         tender_totals[row["tender"]]["refunded"] += row["total"] or Decimal("0")
-    tenders = [{"name": name.replace("_", " ").title(), **values, "net": values["received"] - values["refunded"]} for name, values in sorted(tender_totals.items())]
+    tenders = [{"name": "UPI" if name == "upi" else name.replace("_", " ").title(), **values, "net": values["received"] - values["refunded"]} for name, values in sorted(tender_totals.items())]
 
     item_totals = defaultdict(lambda: {
         "name": "", "kind": Product.Kind.STOCK, "units": 0,

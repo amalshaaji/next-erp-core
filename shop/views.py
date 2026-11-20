@@ -17,9 +17,9 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from .decorators import permission_required
-from .forms import ExpenseForm, ExpenseReversalForm, STAFF_PERMISSION_OPTIONS, ProductForm, ProductImportForm, QuantityStocktakeForm, ShopSettingsForm, StaffInviteForm, StaffPermissionsForm, StockReceiveForm, SupplierForm
-from .models import AuditEvent, Device, Expense, ImportBatch, Membership, Payment, Product, Purchase, ReturnLine, Sale, SaleLine, SaleReturn, SaleVoid, Shop, StaffInvitation, StockMovement, Supplier
-from .services.supabase_api import SupabaseApiError, invite_user
+from .forms import ExpenseForm, ExpenseReversalForm, STAFF_PERMISSION_OPTIONS, ProductForm, ProductImportForm, QuantityStocktakeForm, ShopSettingsForm, StaffAccountForm, StaffPermissionsForm, StockReceiveForm, SupplierForm
+from .models import AuditEvent, Device, Expense, ImportBatch, Membership, Payment, Product, Purchase, ReturnLine, Sale, SaleLine, SaleReturn, SaleVoid, Shop, StockMovement, Supplier
+from .services.supabase_api import SupabaseApiError, create_user
 from .services.reporting import build_daily_financials, build_report, calculate_financials
 from .services.imports import preview_product_csv
 from .services.audit import record_event
@@ -48,7 +48,7 @@ def auth_session(request):
         logger.warning("Supabase sign-in verification failed (%s).", type(exc).__name__)
         return JsonResponse({"error": "Supabase could not verify this sign-in. Please try again."}, status=401)
     if membership is None:
-        return JsonResponse({"error": "This confirmed email is not linked to shop access. Ask your Admin to invite it."}, status=403)
+        return JsonResponse({"error": "This email does not have shop access. Ask your Admin to create an account."}, status=403)
     response = JsonResponse({"ok": True})
     max_age = max(1, min(3600, int(claims["exp"] - timezone.now().timestamp())))
     response.set_cookie("supabase_access_token", token, max_age=max_age, httponly=True, secure=not settings.DEBUG, samesite="Lax")
@@ -356,8 +356,10 @@ def point_of_sale(request):
                 return redirect("receipt", sale_id=previous_sale.pk)
             payload = json.loads(request.POST.get("cart_json", "[]"))
             tender = request.POST.get("tender", "cash").strip()[:32]
-            if not isinstance(payload, list) or not payload or not tender:
+            if not isinstance(payload, list) or not payload:
                 raise ValueError("Add at least one item and choose a payment method.")
+            if tender not in {"cash", "upi", "card", "bank_transfer", "other"}:
+                raise ValueError("Choose a valid payment method.")
             with transaction.atomic():
                 # Serialize receipt numbering and checkout posting per shop.
                 Shop.objects.select_for_update().get(pk=shop.pk)
@@ -413,7 +415,17 @@ def receipt(request, sale_id):
     sale = get_object_or_404(Sale.objects.filter(shop=request.membership.shop).select_related("shop", "cashier", "void_record").prefetch_related("lines", "lines__device", "payments"), pk=sale_id)
     if not request.membership.can("view_sales") and sale.cashier_id != request.membership.pk:
         return HttpResponseForbidden("You can only view receipts for your own sales. Ask your Admin if you need wider access.")
-    return render(request, "shop/receipt.html", {"sale": sale, "has_returns": sale.returns.exists()})
+    tender_labels = {"cash": "Cash", "upi": "UPI", "card": "Card", "bank_transfer": "Bank transfer", "other": "Other"}
+    payment_methods = list(dict.fromkeys(
+        tender_labels.get(payment.tender, payment.tender.replace("_", " ").title())
+        for payment in sale.payments.all()
+        if payment.kind == Payment.Kind.RECEIVED
+    ))
+    return render(request, "shop/receipt.html", {
+        "sale": sale,
+        "has_returns": sale.returns.exists(),
+        "payment_method": ", ".join(payment_methods),
+    })
 
 
 def sales(request):
@@ -585,7 +597,7 @@ def returns(request):
                 tender = request.POST.get("refund_tender", "cash").strip()[:32]
                 if not reason:
                     raise ValueError("Add a reason for the return.")
-                if tender not in {"cash", "card", "bank_transfer", "other"}:
+                if tender not in {"cash", "upi", "card", "bank_transfer", "other"}:
                     raise ValueError("Choose a valid refund payment method.")
                 if quantity < 1:
                     raise ValueError("Return quantity must be at least one.")
@@ -660,7 +672,11 @@ def return_receipt(request, return_id):
     return_record = get_object_or_404(SaleReturn.objects.filter(sale__shop=request.membership.shop).select_related("sale", "sale__shop", "created_by").prefetch_related("lines", "lines__sale_line", "payments"), pk=return_id)
     if not request.membership.can("view_sales") and return_record.sale.cashier_id != request.membership.pk:
         return HttpResponseForbidden("You can only view returns for your own sales unless your Admin grants sales-history access.")
-    return render(request, "shop/return_receipt.html", {"return_record": return_record})
+    refund_method = {"cash": "Cash", "upi": "UPI", "card": "Card", "bank_transfer": "Bank transfer", "other": "Other"}.get(
+        return_record.refund_tender,
+        return_record.refund_tender.replace("_", " ").title(),
+    )
+    return render(request, "shop/return_receipt.html", {"return_record": return_record, "refund_method": refund_method})
 
 
 def shop_settings(request):
@@ -813,36 +829,33 @@ def team(request):
         from django.http import HttpResponseForbidden
         return HttpResponseForbidden("Only an Admin can manage staff access.")
     shop = request.membership.shop
-    invite_form = StaffInviteForm()
+    staff_form = StaffAccountForm()
     if request.method == "POST":
         action = request.POST.get("action")
-        if action == "invite":
-            invite_form = StaffInviteForm(request.POST)
-            if invite_form.is_valid():
-                email = invite_form.cleaned_data["email"].strip().casefold()
+        if action == "create_staff":
+            staff_form = StaffAccountForm(request.POST)
+            if staff_form.is_valid():
+                email = staff_form.cleaned_data["email"].strip().casefold()
                 if Membership.objects.filter(shop=shop, email__iexact=email).exists():
-                    invite_form.add_error("email", "This email already has shop access.")
-                elif StaffInvitation.objects.filter(shop=shop, email__iexact=email, status=StaffInvitation.Status.PENDING).exists():
-                    invite_form.add_error("email", "An invitation is already pending for this email.")
+                    staff_form.add_error("email", "This email already has shop access.")
                 else:
                     try:
-                        result = invite_user(email, request.build_absolute_uri("/sign-in/"))
-                        invited_user = result.get("user", result)
-                        invitation_id = invited_user.get("id")
-                        if not invitation_id:
-                            raise SupabaseApiError("Supabase did not return an invitation ID.")
-                        StaffInvitation.objects.create(
+                        user_id = create_user(email, staff_form.cleaned_data["password"])
+                        permissions = {key: True for key in staff_form.cleaned_data["permissions"]}
+                        member = Membership.objects.create(
                             shop=shop,
+                            supabase_user_id=user_id,
+                            role=Membership.Role.STAFF,
                             email=email,
-                            supabase_user_id=invitation_id,
-                            permissions={key: True for key in invite_form.cleaned_data["permissions"]},
-                            created_by=request.membership,
+                            permissions=permissions,
                         )
-                        record_event(shop, request.membership, "access.staff_invited", "staff_invitation", invitation_id, {"email": email, "permissions": invite_form.cleaned_data["permissions"]})
-                        messages.success(request, f"Invitation sent to {email}. Their Staff access starts after they accept and sign in.")
+                        record_event(shop, request.membership, "access.staff_created", "membership", member.pk, {"email": email, "permissions": staff_form.cleaned_data["permissions"]})
+                        messages.success(request, f"Staff account created for {email}. Share the temporary password with them directly.")
                         return redirect("team")
-                    except (SupabaseApiError, KeyError) as exc:
-                        messages.error(request, str(exc) or "Supabase did not return an invitation ID.")
+                    except SupabaseApiError as exc:
+                        messages.error(request, str(exc))
+                    except IntegrityError:
+                        staff_form.add_error("email", "This account is already linked to shop access.")
         elif action == "permissions":
             member = get_object_or_404(Membership, pk=request.POST.get("member_id"), shop=shop, role=Membership.Role.STAFF)
             form = StaffPermissionsForm(request.POST)
@@ -860,16 +873,5 @@ def team(request):
             record_event(shop, request.membership, "access.staff_deactivated", "membership", member.pk, {"email": member.email})
             messages.success(request, f"{member.display_name or member.email} can no longer access this shop.")
             return redirect("team")
-        elif action == "revoke":
-            invitation = get_object_or_404(StaffInvitation, pk=request.POST.get("invitation_id"), shop=shop, status=StaffInvitation.Status.PENDING)
-            try:
-                invitation.status = StaffInvitation.Status.REVOKED
-                invitation.save(update_fields=["status"])
-                record_event(shop, request.membership, "access.invitation_revoked", "staff_invitation", invitation.pk, {"email": invitation.email})
-                messages.success(request, f"Invitation for {invitation.email} was revoked.")
-                return redirect("team")
-            except SupabaseApiError as exc:
-                messages.error(request, str(exc))
     memberships = Membership.objects.filter(shop=shop).order_by("role", "email")
-    invitations = StaffInvitation.objects.filter(shop=shop).order_by("-created_at")[:30]
-    return render(request, "shop/team.html", {"invite_form": invite_form, "memberships": memberships, "invitations": invitations, "permission_options": STAFF_PERMISSION_OPTIONS})
+    return render(request, "shop/team.html", {"staff_form": staff_form, "memberships": memberships, "permission_options": STAFF_PERMISSION_OPTIONS})
