@@ -45,7 +45,7 @@
     <div class="bill-table-wrap">
       <table class="bill-items">
         <thead>
-          <tr><th scope="col">Item description</th><th scope="col" class="bill-number">Qty</th><th scope="col" class="bill-number">Unit price</th><th scope="col" class="bill-number">Tax</th><th scope="col" class="bill-number">Amount</th></tr>
+          <tr><th scope="col">Item</th><th scope="col" class="bill-number">Qty</th><th scope="col" class="bill-number">Unit price</th><th scope="col" class="bill-number">Tax</th><th scope="col" class="bill-number">Amount</th></tr>
         </thead>
         <tbody>
           {% for line in sale.lines.all %}
@@ -54,10 +54,10 @@
                 <strong>{{ line.description }}</strong>
                 <small>{% if line.item_kind == 'service' %}Service{% elif line.device and line.device.is_second_hand %}Pre-owned device{% elif line.device %}Serialized device{% else %}Product{% endif %}</small>
               </td>
-              <td class="bill-number">{{ line.quantity }} pcs</td>
-              <td class="bill-number">{{ sale.currency }} {{ line.unit_price|floatformat:2 }}</td>
-              <td class="bill-number">{{ sale.currency }} {{ line.tax_amount|floatformat:2 }}</td>
-              <td class="bill-number bill-line-total">{{ sale.currency }} {{ line.line_total|floatformat:2 }}</td>
+              <td class="bill-number" data-label="Qty">{{ line.quantity }} pcs</td>
+              <td class="bill-number" data-label="Unit price">{{ sale.currency }} {{ line.unit_price|floatformat:2 }}</td>
+              <td class="bill-number" data-label="Tax">{{ sale.currency }} {{ line.tax_amount|floatformat:2 }}</td>
+              <td class="bill-number bill-line-total" data-label="Amount">{{ sale.currency }} {{ line.line_total|floatformat:2 }}</td>
             </tr>
           {% empty %}
             <tr><td colspan="5" class="bill-empty">No items were recorded on this receipt.</td></tr>
@@ -73,18 +73,6 @@
         <div><span>Tax{% if sale.tax_rate_snapshot %} ({{ sale.tax_rate_snapshot|floatformat:-3 }}%){% endif %}</span><strong>{{ sale.currency }} {{ sale.tax_total|floatformat:2 }}</strong></div>
         <div class="bill-grand-total"><span>Total paid</span><strong>{{ sale.currency }} {{ sale.total|floatformat:2 }}</strong></div>
       </div>
-    </section>
-
-    <section class="bill-payment-section" aria-label="Payment activity">
-      <div class="bill-section-heading"><h2>Payment activity</h2><span>{{ sale.payments.count }} record{{ sale.payments.count|pluralize }}</span></div>
-      {% for payment in sale.payments.all %}
-        <div class="bill-payment-row">
-          <div><strong>{{ payment.get_kind_display }}</strong><small>{{ payment.get_tender_display|default:payment.tender }}{% if payment.reference %} · Ref {{ payment.reference }}{% endif %}</small></div>
-          <strong>{{ sale.currency }} {{ payment.amount|floatformat:2 }}</strong>
-        </div>
-      {% empty %}
-        <p class="bill-muted">No payment activity is recorded.</p>
-      {% endfor %}
     </section>
 
     <footer class="bill-footer">
