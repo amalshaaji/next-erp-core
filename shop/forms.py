@@ -1,6 +1,6 @@
 from django import forms
 
-from .models import Expense, Product, Shop, Supplier
+from .models import Expense, Membership, Product, Shop, Supplier
 
 
 class ProductForm(forms.ModelForm):
@@ -120,6 +120,11 @@ STAFF_PERMISSION_OPTIONS = [
 
 class StaffAccountForm(forms.Form):
     email = forms.EmailField(label="Staff email")
+    role = forms.ChoiceField(
+        choices=Membership.Role.choices,
+        initial=Membership.Role.STAFF,
+        label="Account type",
+    )
     password = forms.CharField(
         label="Temporary password",
         min_length=8,

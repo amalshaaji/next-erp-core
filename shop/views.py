@@ -841,16 +841,21 @@ def team(request):
                 else:
                     try:
                         user_id = create_user(email, staff_form.cleaned_data["password"])
-                        permissions = {key: True for key in staff_form.cleaned_data["permissions"]}
+                        role = staff_form.cleaned_data["role"]
+                        permissions = (
+                            {key: True for key in staff_form.cleaned_data["permissions"]}
+                            if role == Membership.Role.STAFF else {}
+                        )
                         member = Membership.objects.create(
                             shop=shop,
                             supabase_user_id=user_id,
-                            role=Membership.Role.STAFF,
+                            role=role,
                             email=email,
                             permissions=permissions,
                         )
-                        record_event(shop, request.membership, "access.staff_created", "membership", member.pk, {"email": email, "permissions": staff_form.cleaned_data["permissions"]})
-                        messages.success(request, f"Staff account created for {email}. Share the temporary password with them directly.")
+                        record_event(shop, request.membership, "access.member_created", "membership", member.pk, {"email": email, "role": role, "permissions": permissions})
+                        role_label = Membership.Role(role).label
+                        messages.success(request, f"{role_label} account created for {email}. Share the temporary password with them directly.")
                         return redirect("team")
                     except SupabaseApiError as exc:
                         messages.error(request, str(exc))

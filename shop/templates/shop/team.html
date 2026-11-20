@@ -6,7 +6,7 @@
   <div>
     <p class="eyebrow">YOUR TEAM</p>
     <h1>Team access</h1>
-    <p class="subheading">Add staff and manage their access.</p>
+    <p class="subheading">Add people and manage their access.</p>
   </div>
 </header>
 
@@ -14,8 +14,8 @@
   <section class="panel form-panel">
     <div class="panel-heading">
       <div>
-        <h2>Add staff</h2>
-        <p>Create a sign-in for a staff member.</p>
+        <h2>Add a team member</h2>
+        <p>Create a sign-in for an Admin or Staff member.</p>
       </div>
     </div>
     <form method="post">
@@ -25,6 +25,11 @@
         <label for="id_email">Staff email<span class="required">*</span></label>
         {{ staff_form.email }}
         {% for error in staff_form.email.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+      </div>
+      <div class="form-field">
+        <label for="id_role">Account type<span class="required">*</span></label>
+        {{ staff_form.role }}
+        {% for error in staff_form.role.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
       </div>
       <div class="form-field">
         <label for="id_password">Password<span class="required">*</span></label>
@@ -37,7 +42,8 @@
         {{ staff_form.confirm_password }}
         {% for error in staff_form.confirm_password.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
       </div>
-      <details>
+      <p id="admin-access-note" hidden>Admins have full access to the shop.</p>
+      <details id="staff-permissions">
         <summary>Optional permissions</summary>
         <p>Product lookup and checkout are included automatically.</p>
         <div class="permission-options">
@@ -45,7 +51,7 @@
         </div>
         {% for error in staff_form.permissions.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
       </details>
-      <button class="button button-primary">Create staff account</button>
+      <button class="button button-primary">Create account</button>
     </form>
   </section>
 
@@ -91,4 +97,16 @@
     </div>
   </section>
 </div>
+<script>
+  const accountType = document.getElementById('id_role');
+  const staffPermissions = document.getElementById('staff-permissions');
+  const adminAccessNote = document.getElementById('admin-access-note');
+  function updateAccountAccess() {
+    const isAdmin = accountType.value === 'admin';
+    staffPermissions.hidden = isAdmin;
+    adminAccessNote.hidden = !isAdmin;
+  }
+  accountType.addEventListener('change', updateAccountAccess);
+  updateAccountAccess();
+</script>
 {% endblock %}

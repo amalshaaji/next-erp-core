@@ -14,7 +14,7 @@ Give a small mobile shop one beginner-friendly place to record sales, stock, sup
 
 - **Admin:** Manages the shop, staff access, settings, products, costs, reports, suppliers, expenses, and sales corrections.
 - **Staff:** Uses checkout and only the additional capabilities granted by the Admin.
-- Supabase Auth handles sign-in, sessions, Admin-created Staff accounts, and password recovery. Admins create each Staff account with an email and temporary password, then share the password directly with that person. The app does not email invitations. Public registration and shared user accounts are not supported.
+- Supabase Auth handles sign-in, sessions, Admin-created accounts, and password recovery. An Admin can create an Admin or Staff account with an email and temporary password, then share the password directly with that person. Admin accounts receive full access; Staff accounts receive only selected extra permissions. The app does not email invitations. Public registration and shared user accounts are not supported.
 - Existing legacy memberships are linked to Supabase on first sign-in only when the confirmed Supabase email matches one active membership.
 - Protected pages refresh the Django session cookie from the Supabase client session during navigation and form entry.
 - Django resolves the verified Supabase identity to an active shop membership and enforces every permission on the server. The MVP is isolated to one shop per deployment.
@@ -57,7 +57,7 @@ Give a small mobile shop one beginner-friendly place to record sales, stock, sup
 ## 4. Core acceptance criteria
 
 - An unauthenticated or invalid Supabase session cannot access protected shop data.
-- Only an Admin can create Staff Auth accounts; the temporary password is sent only to Supabase Auth over TLS and is never stored in application data or logs.
+- Only an Admin can create Admin or Staff Auth accounts; the temporary password is sent only to Supabase Auth over TLS and is never stored in application data or logs.
 - Staff permissions are checked on the server; one shop's supplier/product data cannot be selected by another shop.
 - A valid checkout posts one sale, payment, and matching stock movement in a database transaction. Retrying the same request does not duplicate them.
 - A return is linked to its original receipt and cannot exceed the unreturned quantity or paid amount.
