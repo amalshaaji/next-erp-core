@@ -228,3 +228,53 @@
 .bill-payment-row{border-bottom:1px solid #eceef2}
 .bill-footer{border-top:1px solid #e1e4ea;border-bottom:0}
 @media(max-width:720px){.bill{padding:24px 0}.bill-parties{padding:14px 0}.bill-table-wrap{overflow-x:visible}}
+
+@media print{
+  @page{size:auto;margin:3mm}
+  html,body{width:auto!important;min-width:0!important;margin:0!important;padding:0!important;background:#fff!important;color:#111!important;font:8pt/1.3 Arial,sans-serif!important}
+  .app-shell{display:block!important;min-height:0!important}
+  .sidebar,.topbar,.page-header,.receipt-actions,.messages{display:none!important}
+  .main-content{width:100%!important;max-width:none!important;margin:0!important;padding:0!important}
+  .receipt-wrap,.bill-page{width:100%!important;max-width:none!important;margin:0!important;padding:0!important}
+  .bill{width:100%!important;max-width:none!important;margin:0!important;padding:0!important;border:0!important;border-radius:0!important;box-shadow:none!important;background:#fff!important;color:#111!important}
+  .bill-header{align-items:flex-start;gap:3mm;padding:0 0 3mm;border-bottom:1px solid #aaa}
+  .bill-brand{gap:2mm}
+  .bill-brand img{width:10mm!important;height:10mm!important;flex-basis:10mm!important;border:0!important;box-shadow:none!important}
+  .bill-kicker{margin:0 0 1mm;font-size:6pt;letter-spacing:.08em}
+  .bill-brand h1{margin:0;font-size:11pt;line-height:1.15;letter-spacing:0}
+  .bill-tagline{margin-top:1mm;font-size:7pt}
+  .bill-reference{display:grid;justify-items:end;gap:.5mm;max-width:45%;padding:0!important;border:0!important;background:none!important;text-align:right}
+  .bill-reference>span:first-child{font-size:6pt}
+  .bill-reference>strong{font-size:8pt;overflow-wrap:anywhere}
+  .bill-reference small{font-size:6pt}
+  .bill-status{margin:0;padding:0;background:none;color:#111;font-size:6pt}
+  .bill-parties{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:2mm;margin:3mm 0;padding:0 0 3mm;border-bottom:1px solid #bbb}
+  .bill-parties>div:first-child{grid-column:1/-1}
+  .bill-parties span{font-size:6pt;letter-spacing:.04em}
+  .bill-parties strong{font-size:7pt}
+  .bill-table-wrap{width:100%;margin:0;overflow:visible}
+  .bill-items,.bill-items tbody{display:block;width:100%;min-width:0;table-layout:auto}
+  .bill-items thead{display:none!important}
+  .bill-items tr{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"item amount" "qty qty" "price price" "tax tax";gap:0 2mm;margin:0;padding:2.5mm 0;border:0;border-bottom:1px solid #aaa;border-radius:0;background:none!important;break-inside:avoid}
+  .bill-items td{display:block;width:auto!important;min-width:0;padding:.6mm 0;border:0;background:none!important;color:#111;font-size:7pt;white-space:normal;text-align:left;overflow-wrap:anywhere}
+  .bill-items td:first-child{grid-area:item}
+  .bill-items td:nth-child(2){grid-area:qty}
+  .bill-items td:nth-child(3){grid-area:price}
+  .bill-items td:nth-child(4){grid-area:tax}
+  .bill-items td:nth-child(5){grid-area:amount;text-align:right;font-weight:700}
+  .bill-items td[data-label="Qty"],.bill-items td[data-label="Unit price"],.bill-items td[data-label="Tax"]{display:flex;justify-content:space-between;gap:3mm;font-size:6.5pt}
+  .bill-items td[data-label="Qty"]::before,.bill-items td[data-label="Unit price"]::before,.bill-items td[data-label="Tax"]::before{content:attr(data-label);color:#555;font-size:6pt}
+  .bill-items .bill-item-description strong{font-size:8pt}
+  .bill-items .bill-item-description small{margin-top:.3mm;font-size:6pt}
+  .bill-items .bill-empty{grid-column:1/-1;text-align:left!important}
+  .bill-summary{display:block;padding:2.5mm 0;border-bottom:1px solid #aaa;break-inside:avoid}
+  .bill-totals{width:100%!important;padding:0!important;border:0!important;background:none!important}
+  .bill-totals>div{padding:.7mm 0;color:#333;font-size:7pt}
+  .bill-totals strong{font-size:7pt;color:#111}
+  .bill-totals .bill-grand-total{margin-top:1mm;padding:1.5mm 0 0;border-top:1px solid #777;background:none!important;color:#111}
+  .bill-totals .bill-grand-total span,.bill-totals .bill-grand-total strong{color:#111;font-size:8pt}
+  .bill-footer{gap:1mm;margin-top:3mm;padding:2mm 0 0;border-top:1px solid #bbb;text-align:center;break-inside:avoid}
+  .bill-footer p{font-size:6pt}
+  .bill-footer>strong{font-size:7pt}
+  .bill-footer small{font-size:6pt}
+}
