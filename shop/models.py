@@ -7,6 +7,7 @@ from django.utils import timezone as dj_timezone
 
 class Shop(models.Model):
     name = models.CharField(max_length=160)
+    phone = models.CharField(max_length=40, blank=True)
     currency = models.CharField(max_length=3, default="INR")
     timezone = models.CharField(max_length=64, default="Asia/Kolkata")
     tax_rate = models.DecimalField(max_digits=6, decimal_places=3, default=Decimal("0"))
@@ -233,6 +234,7 @@ class Sale(models.Model):
     receipt_number = models.CharField(max_length=32)
     cashier = models.ForeignKey(Membership, on_delete=models.PROTECT)
     shop_name_snapshot = models.CharField(max_length=160, default="")
+    shop_phone_snapshot = models.CharField(max_length=40, blank=True)
     currency = models.CharField(max_length=3, default="INR")
     tax_rate_snapshot = models.DecimalField(max_digits=6, decimal_places=3, default=Decimal("0"))
     receipt_footer_snapshot = models.CharField(max_length=240, blank=True)

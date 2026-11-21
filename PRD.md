@@ -36,6 +36,7 @@ Give a small mobile shop one beginner-friendly place to record sales, stock, sup
 - Staff can find products and services, prepare a bill, choose cash, UPI, card, bank transfer, or another tender, and post a receipt.
 - Prices, tax, totals, and receipt snapshots are calculated on the server with decimal arithmetic.
 - Printed bills use a compact thermal receipt layout and follow the paper size selected in the printer settings.
+- Admins can set a shop phone number in Shop settings. New bills print it below the shop address and snapshot it with the sale so existing receipts retain their original contact details.
 - A repeated checkout submission with the same request key returns the original receipt instead of posting a second sale, payment, or stock movement.
 - Services do not decrement inventory. Missing service costs do not block an estimate; service costs are excluded unless recorded.
 

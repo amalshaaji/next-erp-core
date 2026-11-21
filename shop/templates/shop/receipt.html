@@ -26,6 +26,7 @@
           <p class="bill-kicker">SALES RECEIPT</p>
           <h1 id="bill-shop-name">{{ sale.shop_name_snapshot|default:sale.shop.name }}</h1>
           <p class="bill-address">Panoor, Pallimukku, Alappuzha</p>
+          {% if sale.shop_phone_snapshot %}<p class="bill-phone">Ph: {{ sale.shop_phone_snapshot }}</p>{% endif %}
         </div>
       </div>
       <div class="bill-reference">

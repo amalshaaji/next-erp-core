@@ -386,7 +386,7 @@ def point_of_sale(request):
                 tax = sum(line_taxes, Decimal("0"))
                 total = (subtotal + tax).quantize(CENT)
                 receipt_number = f"{timezone.localdate():%y%m%d}-{Sale.objects.filter(shop=shop, created_at__date=timezone.localdate()).count() + 1:04d}"
-                sale = Sale.objects.create(shop=shop, idempotency_key=idempotency_key, receipt_number=receipt_number, cashier=request.membership, shop_name_snapshot=shop.name, currency=shop.currency, tax_rate_snapshot=shop.tax_rate, receipt_footer_snapshot=shop.receipt_footer, customer_name=request.POST.get("customer_name", "").strip()[:160], subtotal=subtotal, tax_total=tax, total=total, discount_total=Decimal("0"))
+                sale = Sale.objects.create(shop=shop, idempotency_key=idempotency_key, receipt_number=receipt_number, cashier=request.membership, shop_name_snapshot=shop.name, shop_phone_snapshot=shop.phone, currency=shop.currency, tax_rate_snapshot=shop.tax_rate, receipt_footer_snapshot=shop.receipt_footer, customer_name=request.POST.get("customer_name", "").strip()[:160], subtotal=subtotal, tax_total=tax, total=total, discount_total=Decimal("0"))
                 for (product, quantity, device, line_amount), line_tax in zip(prepared, line_taxes):
                     SaleLine.objects.create(sale=sale, product=product, device=device, description=product.name if not device else f"{product.name} · {device.imei} · {device.get_condition_display() if device.condition else 'New'}", item_kind=product.kind, quantity=quantity, unit_price=product.price, unit_cost=device.acquisition_cost if device else product.cost, tax_amount=line_tax, line_total=line_amount + line_tax)
                     if product.kind == Product.Kind.STOCK:
@@ -686,9 +686,9 @@ def shop_settings(request):
     shop = request.membership.shop
     form = ShopSettingsForm(request.POST or None, instance=shop)
     if request.method == "POST" and form.is_valid():
-        previous = {"name": shop.name, "currency": shop.currency, "timezone": shop.timezone, "tax_rate": str(shop.tax_rate), "receipt_footer": shop.receipt_footer}
+        previous = {"name": shop.name, "phone": shop.phone, "currency": shop.currency, "timezone": shop.timezone, "tax_rate": str(shop.tax_rate), "receipt_footer": shop.receipt_footer}
         form.save()
-        current = {"name": shop.name, "currency": shop.currency, "timezone": shop.timezone, "tax_rate": str(shop.tax_rate), "receipt_footer": shop.receipt_footer}
+        current = {"name": shop.name, "phone": shop.phone, "currency": shop.currency, "timezone": shop.timezone, "tax_rate": str(shop.tax_rate), "receipt_footer": shop.receipt_footer}
         changed = {key: {"from": previous[key], "to": current[key]} for key in previous if previous[key] != current[key]}
         if changed:
             record_event(shop, request.membership, "settings.updated", "shop", shop.pk, {"changed_fields": changed})
