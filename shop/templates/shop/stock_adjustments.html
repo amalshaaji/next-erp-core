@@ -63,7 +63,7 @@
           {% for movement in recent %}
             <tr>
               <td><strong>{{ movement.product.display_name }}</strong>{% if movement.product.sku %}<small>{{ movement.product.sku }}</small>{% endif %}</td>
-              <td class="stock-change-column">{% if movement.quantity_delta > 0 %}<span class="stock-change positive-change">+{{ movement.quantity_delta }} pcs</span>{% elif movement.quantity_delta < 0 %}<span class="stock-change negative-change">{{ movement.quantity_delta }} pcs</span>{% else %}<span class="stock-change">No change</span>{% endif %}</td>
+              <td class="stock-change-column">{% if movement.quantity_delta > 0 %}<span class="stock-change positive-change">+{{ movement.quantity_delta }} pieces</span>{% elif movement.quantity_delta < 0 %}<span class="stock-change negative-change">{{ movement.quantity_delta }} pieces</span>{% else %}<span class="stock-change">No change</span>{% endif %}</td>
               <td class="stock-history-note">{{ movement.note }}</td>
               <td>{{ movement.actor.display_name|default:movement.actor.email|default:"—" }}</td>
               <td class="stock-history-date"><time datetime="{{ movement.created_at|date:'c' }}">{{ movement.created_at|date:"d M Y" }}<small>{{ movement.created_at|date:"g:i A" }}</small></time></td>

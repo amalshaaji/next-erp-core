@@ -179,6 +179,7 @@ def dashboard(request):
         "refund_total": refund_total,
         "sales_count": sales.filter(void_record__isnull=True).count(),
         "low_stock": low_stock[:8],
+        "low_stock_count": len(low_stock),
         "recent_sales": (Sale.objects.filter(shop=shop) if request.membership.can("view_sales") else Sale.objects.filter(shop=shop, cashier=request.membership)).select_related("cashier", "void_record").prefetch_related("lines")[:8],
         "product_count": product_rows.count(),
         "show_profit": show_profit,
@@ -684,7 +685,7 @@ def reports_csv(request):
         columns += ["Cost of goods", "Gross margin"]
     writer.writerow(columns)
     for item in report["products"]:
-        row = [safe_cell(item["name"]), item["kind"], f'{item["units"]} pcs', item["revenue"]]
+        row = [safe_cell(item["name"]), item["kind"], f'{item["units"]} pieces', item["revenue"]]
         if request.membership.can_costs:
             row += [item["cost"], item["margin"]]
         writer.writerow(row)
@@ -695,7 +696,7 @@ def reports_csv(request):
     writer.writerow([])
     writer.writerow(["Low-stock item", "SKU", "On hand", "Reorder level"])
     for item in report["low_stock"]:
-        writer.writerow([safe_cell(item["name"]), safe_cell(item["sku"]), f'{item["on_hand"]} pcs', f'{item["reorder_level"]} pcs'])
+        writer.writerow([safe_cell(item["name"]), safe_cell(item["sku"]), f'{item["on_hand"]} pieces', f'{item["reorder_level"]} pieces'])
     return response
 
 

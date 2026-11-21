@@ -133,7 +133,7 @@
       title.append(element('strong', 'pos-product-brand', line.name));
       if (line.model) title.append(element('span', 'pos-product-model', line.model));
       description.append(title, element('small', '',
-        line.imei ? `IMEI ${line.imei}` : `${line.quantity} ${line.kind === 'service' ? 'service(s)' : 'pcs'}`));
+        line.imei ? `IMEI ${line.imei}` : `${line.quantity} ${line.kind === 'service' ? 'service(s)' : 'pieces'}`));
       const amount = element('span');
       amount.id = `cart-amount-${index}`;
       const remove = element('button', 'remove-line', '×');
@@ -166,7 +166,7 @@
       }
       if (!line.deviceId) {
         const limit = line.kind === 'service' ? 99 : line.stock;
-        const label = element('label', 'cart-quantity-field', line.kind === 'service' ? 'Quantity' : 'Qty (pcs)');
+        const label = element('label', 'cart-quantity-field', line.kind === 'service' ? 'Quantity' : 'Qty (pieces)');
         const input = element('input');
         input.type = 'number';
         input.min = '1';

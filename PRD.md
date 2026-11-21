@@ -24,6 +24,7 @@ Give a small mobile shop one beginner-friendly place to record sales, stock, sup
 ### Catalog and inventory
 
 - Products have a name, optional SKU/category/model/supplier, kind, second-hand flag, price, optional cost, reorder level, and active state.
+- New products default to a low-stock reorder level of 1 piece; existing inventory uses the same threshold unless changed by the Admin.
 - Product creation counts stock in **pieces**. The catalog does not offer an IMEI tracking choice. A starting quantity creates a stock movement.
 - Services can be billed in POS without changing stock.
 - The existing serialized-device model supports previously recorded/imported IMEI inventory and checkout. The current Add Product form creates quantity-tracked products.

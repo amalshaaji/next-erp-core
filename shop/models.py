@@ -117,7 +117,7 @@ class Product(models.Model):
     is_second_hand = models.BooleanField(default=False)
     price = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0"))
     cost = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
-    reorder_level = models.PositiveIntegerField(default=0)
+    reorder_level = models.PositiveIntegerField(default=1)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(default=dj_timezone.now)
 
