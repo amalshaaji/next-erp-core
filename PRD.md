@@ -29,12 +29,16 @@ Give a small mobile shop one beginner-friendly place to record sales, stock, sup
 - The existing serialized-device model supports previously recorded/imported IMEI inventory and checkout. The current Add Product form creates quantity-tracked products.
 - Stock receives, opening quantities, sales, returns, voids, and count corrections are represented by stock movements. Posted movements are not silently overwritten.
 - The Inventory header offers Add product; Receive stock is accessed from Suppliers & purchases.
+- Products & inventory shows the model in its own column immediately to the right of the brand/product name, with a dash for items without a model.
+- Each Products & inventory row offers Edit and Delete to Admins and Staff with product-management permission. Edits change catalog details and future prices; item type and tracking stay fixed, stock quantities use the Stock count flow, and completed receipt/device acquisition history is preserved. Buying prices remain hidden and uneditable without cost access. Delete requires a confirmation page and removes the item from active inventory and checkout while preserving all linked history.
 - Supplier selection is shop-scoped. Supplier records show assigned products, summarized receipt activity, and the date added from their creation audit record. Older records without that event display “Not recorded”.
 
 ### Checkout and receipts
 
 - Staff can find products and services, prepare a bill, choose cash, UPI, card, bank transfer, or another tender, and post a receipt.
+- New sale shows each model beside its brand/product name, with stock below and the price aligned on the right. Current bill and new receipt descriptions include the model so items sharing a brand remain distinguishable.
 - Prices, tax, totals, and receipt snapshots are calculated on the server with decimal arithmetic.
+- In Current bill, Admins and Staff with the price/discount permission can edit each item's selling price before checkout. The server validates nonnegative prices with at most two decimal places, recalculates tax and payment totals, snapshots the agreed price on the receipt, and audits changes from the catalog price. Catalog prices and completed bills remain unchanged; returns use the price actually paid.
 - Printed bills use a compact thermal receipt layout and follow the paper size selected in the printer settings.
 - Admins can set the shop address, phone, and email in Shop settings. New invoices print and snapshot those details; checkout can optionally record the customer's phone number on the sale and receipt.
 - A repeated checkout submission with the same request key returns the original receipt instead of posting a second sale, payment, or stock movement.

@@ -13,11 +13,12 @@ from django.db import IntegrityError, connection, transaction
 from django.db.models import Count, Exists, Max, Min, OuterRef, Prefetch, Sum
 from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseForbidden, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from .decorators import permission_required
-from .forms import ExpenseForm, ExpenseReversalForm, STAFF_PERMISSION_OPTIONS, ProductForm, ProductImportForm, QuantityStocktakeForm, ShopSettingsForm, StaffAccountForm, StaffPermissionsForm, StockReceiveForm, SupplierForm
+from .forms import CheckoutLinePriceForm, ExpenseForm, ExpenseReversalForm, STAFF_PERMISSION_OPTIONS, ProductForm, ProductImportForm, QuantityStocktakeForm, ShopSettingsForm, StaffAccountForm, StaffPermissionsForm, StockReceiveForm, SupplierForm
 from .models import AuditEvent, Device, Expense, ImportBatch, Membership, Payment, Product, Purchase, ReturnLine, Sale, SaleLine, SaleReturn, SaleVoid, Shop, StockMovement, Supplier
 from .services.supabase_api import SupabaseApiError, create_user
 from .services.reporting import build_daily_financials, build_report, calculate_financials
@@ -27,6 +28,7 @@ from .services.auth import resolve_membership, verify_access_token
 
 
 CENT = Decimal("0.01")
+MAX_MONEY = Decimal("9999999999.99")
 logger = logging.getLogger(__name__)
 
 
@@ -198,9 +200,21 @@ def product_list(request):
     return render(request, "shop/products.html", {"products": products.distinct(), "query": query, "search_suggestions": suggestions})
 
 
+def _product_form_context(form, product=None):
+    return {
+        "form": form,
+        "product": product,
+        "product_detail_fields": [form[name] for name in ("name", "sku", "category", "brand_model", "supplier")],
+        "sale_setting_fields": [form[name] for name in ("kind", "is_second_hand", "price", "cost") if name in form.fields],
+        "stock_fields": [form[name] for name in ("reorder_level", "opening_quantity") if name in form.fields],
+    }
+
+
 @permission_required("products_edit")
+@require_http_methods(["GET", "POST"])
 def product_create(request):
-    form = ProductForm(request.POST or None, shop=request.membership.shop)
+    form = ProductForm(request.POST if request.method == "POST" else None,
+                       shop=request.membership.shop, can_view_costs=request.membership.can_costs)
     if request.method == "POST" and form.is_valid():
         with transaction.atomic():
             product = form.save(commit=False)
@@ -219,12 +233,57 @@ def product_create(request):
             record_event(product.shop, request.membership, "catalog.product_created", "product", product.pk, {"name": product.name, "sku": product.sku, "opening_pieces": opening_quantity})
         messages.success(request, "Product added.")
         return redirect("products")
-    return render(request, "shop/product_form.html", {
-        "form": form,
-        "product_detail_fields": [form[name] for name in ("name", "sku", "category", "brand_model", "supplier")],
-        "sale_setting_fields": [form[name] for name in ("kind", "is_second_hand", "price", "cost")],
-        "stock_fields": [form[name] for name in ("reorder_level", "opening_quantity")],
-    })
+    return render(request, "shop/product_form.html", _product_form_context(form))
+
+
+@permission_required("products_edit")
+@require_http_methods(["GET", "POST"])
+def product_edit(request, product_id):
+    shop = request.membership.shop
+    with transaction.atomic():
+        # Match checkout's lock order so editing cannot overwrite a concurrent sale.
+        if request.method == "POST":
+            Shop.objects.select_for_update().get(pk=shop.pk)
+        products = Product.objects.filter(shop=shop, is_active=True)
+        if request.method == "POST":
+            products = products.select_for_update()
+        product = get_object_or_404(products, pk=product_id)
+        form = ProductForm(request.POST if request.method == "POST" else None,
+                           instance=product, shop=shop, can_view_costs=request.membership.can_costs)
+        if request.method == "POST" and form.is_valid():
+            changed_fields = list(form.changed_data)
+            try:
+                with transaction.atomic():
+                    # Write only editable fields, keeping stock and device records intact.
+                    if changed_fields:
+                        product.save(update_fields=changed_fields)
+                        record_event(shop, request.membership, "catalog.product_updated", "product", product.pk,
+                                     {"name": product.name, "sku": product.sku, "changed_fields": changed_fields})
+            except IntegrityError:
+                form.add_error("sku", "This SKU is already used by another item. Choose a different SKU.")
+            else:
+                messages.success(request, "Product updated.")
+                return redirect("products")
+    return render(request, "shop/product_form.html", _product_form_context(form, product))
+
+
+@permission_required("products_edit")
+@require_http_methods(["GET", "POST"])
+def product_delete(request, product_id):
+    shop = request.membership.shop
+    if request.method == "POST":
+        with transaction.atomic():
+            Shop.objects.select_for_update().get(pk=shop.pk)
+            product = get_object_or_404(Product.objects.select_for_update(), pk=product_id, shop=shop)
+            if product.is_active:
+                product.is_active = False
+                product.save(update_fields=["is_active"])
+                record_event(shop, request.membership, "catalog.product_deleted", "product", product.pk,
+                             {"name": product.name, "sku": product.sku, "stock_on_hand": product.on_hand})
+        messages.success(request, "Product deleted from inventory and checkout. Its history is preserved.")
+        return redirect("products")
+    product = get_object_or_404(Product, pk=product_id, shop=shop, is_active=True)
+    return render(request, "shop/product_delete.html", {"product": product})
 
 
 @permission_required("products_edit")
@@ -348,6 +407,7 @@ def point_of_sale(request):
     products = Product.objects.filter(shop=shop, is_active=True).order_by("name")
     stock_products = products.filter(kind=Product.Kind.STOCK)
     devices = Device.objects.filter(shop=shop, status=Device.Status.IN_STOCK).select_related("product").order_by("product__name", "imei")
+    payload = []
     if request.method == "POST":
         try:
             idempotency_key = uuid.UUID(request.POST.get("request_key", ""))
@@ -364,8 +424,13 @@ def point_of_sale(request):
                 # Serialize receipt numbering and checkout posting per shop.
                 Shop.objects.select_for_update().get(pk=shop.pk)
                 prepared = []
+                price_changes = []
+                reserved_quantities = {}
+                reserved_devices = set()
                 subtotal = Decimal("0")
                 for raw in payload:
+                    if not isinstance(raw, dict):
+                        raise ValueError("Review the items in the current bill.")
                     product = get_object_or_404(Product.objects.select_for_update(), pk=int(raw["product_id"]), shop=shop, is_active=True)
                     quantity = int(raw.get("quantity", 1))
                     if quantity < 1 or product.kind == Product.Kind.SERVICE and quantity > 99:
@@ -375,27 +440,50 @@ def point_of_sale(request):
                         if quantity != 1 or not raw.get("device_id"):
                             raise ValueError(f"Select an available IMEI for {product.name}.")
                         device = get_object_or_404(Device.objects.select_for_update(), pk=int(raw["device_id"]), shop=shop, product=product, status=Device.Status.IN_STOCK)
+                        if device.pk in reserved_devices:
+                            raise ValueError("The same IMEI cannot appear twice in a bill.")
+                        reserved_devices.add(device.pk)
                     elif product.kind == Product.Kind.STOCK:
-                        if product.on_hand < quantity:
+                        reserved_quantities[product.pk] = reserved_quantities.get(product.pk, 0) + quantity
+                        if product.on_hand < reserved_quantities[product.pk]:
                             raise ValueError(f"Not enough stock for {product.name}; available: {product.on_hand}.")
-                    amount = (product.price * quantity).quantize(CENT, rounding=ROUND_HALF_UP)
+                    unit_price = product.price
+                    if "unit_price" in raw:
+                        price_form = CheckoutLinePriceForm({"unit_price": raw["unit_price"]})
+                        if not price_form.is_valid():
+                            raise ValueError(f"Selling price for {product.name}: {price_form.errors['unit_price'][0]}")
+                        unit_price = price_form.cleaned_data["unit_price"].quantize(CENT)
+                        if unit_price != product.price:
+                            if not request.membership.can("discounts"):
+                                raise ValueError("You do not have permission to edit bill prices. Ask your Admin for access.")
+                            price_changes.append({
+                                "product_id": product.pk, "device_id": device.pk if device else None,
+                                "quantity": quantity, "catalog_price": str(product.price),
+                                "unit_price": str(unit_price),
+                            })
+                    amount = (unit_price * quantity).quantize(CENT, rounding=ROUND_HALF_UP)
                     subtotal += amount
-                    prepared.append((product, quantity, device, amount))
+                    prepared.append((product, quantity, device, unit_price, amount))
 
-                line_taxes = [(amount * shop.tax_rate / Decimal("100")).quantize(CENT, rounding=ROUND_HALF_UP) for _, _, _, amount in prepared]
+                line_taxes = [(amount * shop.tax_rate / Decimal("100")).quantize(CENT, rounding=ROUND_HALF_UP) for _, _, _, _, amount in prepared]
                 tax = sum(line_taxes, Decimal("0"))
                 total = (subtotal + tax).quantize(CENT)
+                if any(value > MAX_MONEY for value in (subtotal, tax, total)):
+                    raise ValueError("The bill amount is too large. Reduce the price or quantity.")
                 receipt_number = f"{timezone.localdate():%y%m%d}-{Sale.objects.filter(shop=shop, created_at__date=timezone.localdate()).count() + 1:04d}"
                 sale = Sale.objects.create(shop=shop, idempotency_key=idempotency_key, receipt_number=receipt_number, cashier=request.membership, shop_name_snapshot=shop.name, shop_address_snapshot=shop.address, shop_phone_snapshot=shop.phone, shop_email_snapshot=shop.email, currency=shop.currency, tax_rate_snapshot=shop.tax_rate, receipt_footer_snapshot=shop.receipt_footer, customer_name=request.POST.get("customer_name", "").strip()[:160], customer_phone=request.POST.get("customer_phone", "").strip()[:40], subtotal=subtotal, tax_total=tax, total=total, discount_total=Decimal("0"))
-                for (product, quantity, device, line_amount), line_tax in zip(prepared, line_taxes):
-                    SaleLine.objects.create(sale=sale, product=product, device=device, description=product.name if not device else f"{product.name} · {device.imei} · {device.get_condition_display() if device.condition else 'New'}", item_kind=product.kind, quantity=quantity, unit_price=product.price, unit_cost=device.acquisition_cost if device else product.cost, tax_amount=line_tax, line_total=line_amount + line_tax)
+                for (product, quantity, device, unit_price, line_amount), line_tax in zip(prepared, line_taxes):
+                    product_label = " ".join(value for value in (product.name, product.brand_model) if value)
+                    device_suffix = f" · {device.imei} · {device.get_condition_display() if device.condition else 'New'}" if device else ""
+                    description = product_label[:180 - len(device_suffix)] + device_suffix
+                    SaleLine.objects.create(sale=sale, product=product, device=device, description=description, item_kind=product.kind, quantity=quantity, unit_price=unit_price, unit_cost=device.acquisition_cost if device else product.cost, tax_amount=line_tax, line_total=line_amount + line_tax)
                     if product.kind == Product.Kind.STOCK:
                         if device:
                             device.status = Device.Status.SOLD
                             device.save(update_fields=["status"])
                         StockMovement.objects.create(shop=shop, product=product, device=device, quantity_delta=-quantity, reason=StockMovement.Reason.SALE, note=f"Receipt {sale.receipt_number}", sale=sale, actor=request.membership)
                 Payment.objects.create(sale=sale, tender=tender, amount=total, reference=request.POST.get("payment_reference", "").strip()[:100])
-                record_event(shop, request.membership, "sales.completed", "sale", sale.pk, {"receipt": sale.receipt_number, "total": str(sale.total), "currency": sale.currency})
+                record_event(shop, request.membership, "sales.completed", "sale", sale.pk, {"receipt": sale.receipt_number, "total": str(sale.total), "currency": sale.currency, "price_changes": price_changes})
             return redirect("receipt", sale_id=sale.pk)
         except IntegrityError:
             previous_sale = Sale.objects.filter(shop=shop, idempotency_key=request.POST.get("request_key", "")).first()
@@ -407,8 +495,8 @@ def point_of_sale(request):
                 retry_key = uuid.UUID(request.POST.get("request_key", ""))
             except (ValueError, TypeError, AttributeError):
                 retry_key = uuid.uuid4()
-            return render(request, "shop/pos.html", {"products": products, "stock_products": stock_products, "devices": devices, "request_key": retry_key, "error": str(exc) or "Please review the sale details."})
-    return render(request, "shop/pos.html", {"products": products, "stock_products": stock_products, "devices": devices, "request_key": uuid.uuid4()})
+            return render(request, "shop/pos.html", {"products": products, "stock_products": stock_products, "devices": devices, "request_key": retry_key, "error": str(exc) or "Please review the sale details.", "cart_payload": payload if isinstance(payload, list) else [], "can_edit_prices": request.membership.can("discounts")})
+    return render(request, "shop/pos.html", {"products": products, "stock_products": stock_products, "devices": devices, "request_key": uuid.uuid4(), "can_edit_prices": request.membership.can("discounts"), "cart_payload": []})
 
 
 def receipt(request, sale_id):

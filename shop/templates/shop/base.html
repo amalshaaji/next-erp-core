@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Next{% endblock %} · Next</title>
   <link rel="icon" type="image/png" href="{% static 'shop/favicon.png' %}?v=27613e58122e">
-  <link rel="stylesheet" href="{% static 'shop/shop.css' %}?v=20261121-5">
+  <link rel="stylesheet" href="{% static 'shop/shop.css' %}?v=20261122-5">
   <link rel="stylesheet" href="{% static 'shop/reference-theme.css' %}?v=20261120-4">
 </head>
 <body>
@@ -17,7 +17,7 @@
       <nav class="topnav" aria-label="Main navigation">
         <a href="{% url 'dashboard' %}" class="nav-link {% if current == 'dashboard' %}is-active{% endif %}" {% if current == 'dashboard' %}aria-current="page"{% endif %}>{% include 'shop/includes/icon.html' with name='home' %}Overview</a>
         <a href="{% url 'pos' %}" class="nav-link {% if current == 'pos' %}is-active{% endif %}" {% if current == 'pos' %}aria-current="page"{% endif %}>{% include 'shop/includes/icon.html' with name='bag' %}New sale</a>
-        <a href="{% url 'products' %}" class="nav-link {% if current == 'products' or current == 'product_create' or current == 'product_import' %}is-active{% endif %}" {% if current == 'products' %}aria-current="page"{% endif %}>{% include 'shop/includes/icon.html' with name='box' %}Inventory</a>
+        <a href="{% url 'products' %}" class="nav-link {% if current == 'products' or current == 'product_create' or current == 'product_edit' or current == 'product_delete' or current == 'product_import' %}is-active{% endif %}" {% if current == 'products' %}aria-current="page"{% endif %}>{% include 'shop/includes/icon.html' with name='box' %}Inventory</a>
         <a href="{% url 'sales' %}" class="nav-link {% if current == 'sales' or current == 'receipt' %}is-active{% endif %}" {% if current == 'sales' %}aria-current="page"{% endif %}>{% include 'shop/includes/icon.html' with name='chart' %}Sales</a>
         {% if request.membership.can_reports %}<a href="{% url 'reports' %}" class="nav-link {% if current == 'reports' %}is-active{% endif %}" {% if current == 'reports' %}aria-current="page"{% endif %}>{% include 'shop/includes/icon.html' with name='receipt' %}Reports</a>{% endif %}
         {% if request.membership.can_stock_adjust or request.membership.can_receive_purchases or request.membership.can_expenses or request.membership.can_refunds or request.membership.role == 'admin' %}<details class="nav-more"><summary class="nav-link">{% include 'shop/includes/icon.html' with name='more' %}More <span aria-hidden="true">⌄</span></summary><div class="nav-menu">

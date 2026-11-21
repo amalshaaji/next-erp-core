@@ -1,4 +1,5 @@
 from django import forms
+from django.db.models import Q
 
 from .models import Expense, Membership, Product, Shop, Supplier
 
@@ -25,14 +26,29 @@ class ProductForm(forms.ModelForm):
             "reorder_level": forms.NumberInput(attrs={"min": "0", "step": "1", "placeholder": "0"}),
         }
 
-    def __init__(self, *args, shop, **kwargs):
+    def __init__(self, *args, shop, can_view_costs=True, **kwargs):
         super().__init__(*args, **kwargs)
+        self.shop = shop
         for field_name in ("price", "cost", "reorder_level"):
             self.fields[field_name].initial = None
+        if not can_view_costs:
+            self.fields.pop("cost")
         self.fields["reorder_level"].required = False
-        self.fields["supplier"].queryset = Supplier.objects.filter(shop=shop, is_active=True)
+        suppliers = Supplier.objects.filter(shop=shop, is_active=True)
+        if self.instance.pk and self.instance.supplier_id:
+            suppliers = Supplier.objects.filter(shop=shop).filter(
+                Q(is_active=True) | Q(pk=self.instance.supplier_id)
+            )
+        self.fields["supplier"].queryset = suppliers
         self.fields["supplier"].required = False
         self.fields["supplier"].empty_label = "Choose a saved supplier (optional)"
+        if self.instance.pk:
+            self.fields["kind"].disabled = True
+            self.fields["kind"].help_text = "Type stays the same to preserve stock and sales history."
+            if self.instance.tracking == Product.Tracking.SERIALIZED:
+                self.fields["is_second_hand"].disabled = True
+                self.fields["is_second_hand"].help_text = "Individual phone records keep their condition and acquisition details."
+            return
         self.fields["tracking"] = forms.ChoiceField(
             choices=[(Product.Tracking.QUANTITY, Product.Tracking.QUANTITY.label)],
             initial=Product.Tracking.QUANTITY,
@@ -48,8 +64,31 @@ class ProductForm(forms.ModelForm):
             widget=forms.NumberInput(attrs={"min": "0", "step": "1", "placeholder": "0"}),
         )
 
+    def clean_sku(self):
+        sku = self.cleaned_data["sku"]
+        if sku and Product.objects.filter(shop=self.shop, sku=sku).exclude(pk=self.instance.pk).exists():
+            raise forms.ValidationError("This SKU is already used by another item, including deleted items. Choose a different SKU.")
+        return sku
+
+    def clean_price(self):
+        price = self.cleaned_data["price"]
+        if price < 0:
+            raise forms.ValidationError("Selling price cannot be negative.")
+        return price
+
+    def clean_cost(self):
+        cost = self.cleaned_data["cost"]
+        if cost is not None and cost < 0:
+            raise forms.ValidationError("Buying price cannot be negative.")
+        return cost
+
     def clean(self):
         data = super().clean()
+        if self.instance.pk:
+            if data.get("kind") == Product.Kind.SERVICE:
+                data["is_second_hand"] = False
+            data["reorder_level"] = data.get("reorder_level") or 0
+            return data
         if data.get("kind") == Product.Kind.SERVICE:
             data["tracking"] = Product.Tracking.QUANTITY
             data["is_second_hand"] = False
@@ -60,6 +99,12 @@ class ProductForm(forms.ModelForm):
             self.add_error("opening_quantity", "Services do not have stock pieces.")
         data["opening_quantity"] = opening_quantity
         return data
+
+class CheckoutLinePriceForm(forms.Form):
+    unit_price = forms.DecimalField(
+        max_digits=12, decimal_places=2, min_value=0, label="Selling price",
+    )
+
 
 class StockReceiveForm(forms.Form):
     supplier = forms.ModelChoiceField(queryset=Supplier.objects.none(), required=False, empty_label="Cash purchase / supplier not listed", label="Supplier")
@@ -105,12 +150,12 @@ class StockReceiveForm(forms.Form):
 
 
 STAFF_PERMISSION_OPTIONS = [
-    ("products_edit", "Add and edit products"),
+    ("products_edit", "Add, edit, and delete products"),
     ("purchases", "Receive stock and purchase phones"),
     ("view_sales", "View all sales"),
     ("view_costs", "View purchase costs"),
     ("stock_adjust", "Adjust stock"),
-    ("discounts", "Apply discounts"),
+    ("discounts", "Edit bill prices and apply discounts"),
     ("refunds", "Process returns and refunds"),
     ("voids", "Void sales"),
     ("exports", "Export reports"),

@@ -1,8 +1,9 @@
 {% extends 'shop/base.html' %}
-{% block title %}Add a product{% endblock %}
+{% block title %}{% if product %}Edit product{% else %}Add a product{% endif %}{% endblock %}
 {% block content %}
-<header class="page-header"><div><p class="eyebrow">PRODUCTS</p><h1>Add a product or service</h1></div></header>
+<header class="page-header"><div><p class="eyebrow">PRODUCTS</p><h1>{% if product %}Edit {{ product.name }}{% else %}Add a product or service{% endif %}</h1></div></header>
 <section class="panel form-panel product-form-panel">
+  {% if product %}<div class="notice"><p>Changes apply to future sales. Completed receipts and stock history keep their original details.</p>{% if product.kind == 'stock' %}<p><strong>Current stock: {{ product.on_hand }} pieces.</strong> {% if request.membership.can_stock_adjust %}<a href="{% url 'stock_adjustments' %}">Use Stock count to correct inventory.</a>{% else %}Ask your Admin if the stock count needs correcting.{% endif %}</p>{% endif %}</div>{% endif %}
   <form method="post">{% csrf_token %}{{ form.tracking }}
     {% if form.non_field_errors %}<div class="form-errors">{{ form.non_field_errors }}</div>{% endif %}
     <div class="form-grid">
@@ -10,19 +11,20 @@
       {% include 'shop/includes/product_form_fields.html' with fields=sale_setting_fields %}
       {% include 'shop/includes/product_form_fields.html' with fields=stock_fields %}
     </div>
-    <div class="form-actions"><a class="button button-secondary" href="{% url 'products' %}">Cancel</a><button class="button button-primary">Save product</button></div>
+    <div class="form-actions"><a class="button button-secondary" href="{% url 'products' %}">Cancel</a><button class="button button-primary">{% if product %}Save changes{% else %}Save product{% endif %}</button></div>
   </form>
 </section>
 {% endblock %}
 {% block scripts %}<script>
 const kindField = document.getElementById('id_kind');
 const secondHandField = document.getElementById('id_is_second_hand');
+const secondHandLocked = secondHandField.disabled;
 const openingStockField = document.getElementById('opening-stock-field');
 function updateOpeningStockField() {
   const isService = kindField.value === 'service';
-  secondHandField.disabled = isService;
+  secondHandField.disabled = secondHandLocked || isService;
   if (isService) secondHandField.checked = false;
-  openingStockField.hidden = isService;
+  if (openingStockField) openingStockField.hidden = isService;
 }
 kindField.addEventListener('change', updateOpeningStockField);
 secondHandField.addEventListener('change', updateOpeningStockField);

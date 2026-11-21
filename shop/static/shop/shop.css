@@ -348,3 +348,27 @@
   .invoice-footer p{font-size:7pt}
   .invoice-footer small{font-size:6pt}
 }
+
+.product-row-actions{display:flex;align-items:center;gap:8px}
+.product-row-actions .button{min-height:44px;padding:9px 12px;white-space:nowrap}
+.product-row-actions .danger-text{color:var(--red)}
+.product-table .product-name-cell{min-width:150px;max-width:260px;white-space:normal;overflow-wrap:anywhere}
+.product-table .product-name-cell strong{font-weight:700;letter-spacing:.01em}
+.product-table .product-model-cell{min-width:100px;max-width:200px;white-space:normal;overflow-wrap:anywhere;color:#465268;font-weight:500;font-variant-numeric:tabular-nums}
+.product-table .product-price-cell{font-variant-numeric:tabular-nums;white-space:nowrap}
+.product-table .product-price-cell small{display:block;margin-top:4px;color:var(--muted);font-size:10px;font-weight:400}
+.cart-line-controls{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:12px;align-items:end}
+.cart-line-controls label{display:grid;gap:6px;color:var(--muted);font-size:11px}
+.cart-line-controls input{width:145px;max-width:100%;min-height:44px;padding:9px;border:1px solid var(--line);border-radius:7px;font:inherit;font-size:14px;color:var(--ink)}
+.cart-line-controls .cart-quantity-field input{width:85px}
+.cart-line-controls input:focus-visible{outline:3px solid #517fff;outline-offset:2px}
+.cart-line-controls input[aria-invalid="true"]{border-color:var(--red)}
+.cart-panel .bill-price-help{margin-top:6px;font-size:11px;color:var(--muted)}
+.pos-catalog .item-result{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;padding:14px 10px;min-height:72px}
+.pos-catalog .item-result[hidden]{display:none}
+.pos-product-title{display:flex;align-items:baseline;flex-wrap:wrap;gap:8px;line-height:1.5}
+.pos-product-brand{font-size:13px;font-weight:700;overflow-wrap:anywhere}
+.pos-product-model{display:inline-block;padding:3px 9px;border:1px solid #bdd2ff;border-radius:6px;background:#e8f0ff;color:#1746a2;font-size:13px;font-weight:800;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.pos-catalog .stock-name small{margin-top:5px;font-size:11px}
+.pos-catalog .pos-product-price{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.cart-line .pos-product-title{margin-bottom:4px}
