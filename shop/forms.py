@@ -59,7 +59,7 @@ class ProductForm(forms.ModelForm):
             min_value=0,
             required=False,
             initial=None,
-            label="Opening stock (pieces)",
+            label="Quantity",
             help_text="Starting quantity for this item.",
             widget=forms.NumberInput(attrs={"min": "0", "step": "1", "placeholder": "0"}),
         )
