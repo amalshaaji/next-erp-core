@@ -1,8 +1,11 @@
 from django.urls import path
 
 from . import views
+from .entry_management import manage_entry
 
 urlpatterns = [
+    path("stock/<int:product_id>/quick/", views.quick_stock, name="quick_stock"),
+    path("entries/<str:kind>/<str:entry_id>/<str:action>/", manage_entry, name="manage_entry"),
     path("sign-in/", views.sign_in, name="sign_in"),
     path("auth/session/", views.auth_session, name="auth_session"),
     path("sign-out/", views.sign_out, name="sign_out"),

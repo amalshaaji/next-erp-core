@@ -305,7 +305,7 @@ def build_report(shop, start_date, end_date):
     for product in Product.objects.filter(shop=shop, is_active=True, kind=Product.Kind.STOCK).order_by("name"):
         available = serialized_stock.get(product.pk, 0) if product.tracking == Product.Tracking.SERIALIZED else quantity_stock.get(product.pk, 0)
         if available <= product.reorder_level:
-            low_stock.append({"name": product.name, "sku": product.sku, "on_hand": available, "reorder_level": product.reorder_level})
+            low_stock.append({"name": product.display_name, "sku": product.sku, "on_hand": available, "reorder_level": product.reorder_level})
 
     return {
         "sales_count": sales.count(),

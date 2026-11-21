@@ -8,7 +8,7 @@
 <section class="panel">
   <form class="search-bar" method="get">
     <label class="sr-only" for="product-search">Search products</label><input id="product-search" name="q" value="{{ query }}" placeholder="Search by name, model, or SKU" list="product-search-suggestions" autocomplete="off">
-    <datalist id="product-search-suggestions">{% for item in search_suggestions %}{% if item.name %}<option value="{{ item.name }}">{% endif %}{% if item.brand_model %}<option value="{{ item.brand_model }}">{% endif %}{% if item.sku %}<option value="{{ item.sku }}">{% endif %}{% endfor %}</datalist>
+    <datalist id="product-search-suggestions">{% for item in search_suggestions %}{% if item.name %}<option value="{{ item.display_name }}">{% endif %}{% if item.brand_model %}<option value="{{ item.brand_model }}">{% endif %}{% if item.sku %}<option value="{{ item.sku }}">{% endif %}{% endfor %}</datalist>
     <button class="button button-secondary">Search</button>
   </form>
   {% if products %}
@@ -22,10 +22,10 @@
           <td>{% if product.category %}{{ product.category }}{% else %}<span class="muted">Uncategorized</span>{% endif %}</td>
           <td>{% if product.kind == 'service' %}<span class="badge badge-blue">Service</span>{% elif product.is_second_hand %}<span class="badge badge-amber">Used phone</span>{% else %}<span class="badge">Product</span>{% endif %}</td>
           <td>{{ product.sku|default:product.get_tracking_display }}</td>
-          <td>{% if product.kind == 'service' %}<span class="muted">Not stocked</span>{% else %}{{ product.on_hand }} pcs{% if product.reorder_level and product.on_hand <= product.reorder_level %}<span class="badge badge-amber">Low</span>{% endif %}{% endif %}</td>
+          <td>{% if product.kind == 'service' %}<span class="muted">Not stocked</span>{% else %}{{ product.current_stock }} pcs{% if product.reorder_level and product.current_stock <= product.reorder_level %}<span class="badge badge-amber">Low</span>{% endif %}{% if product.tracking == 'quantity' and request.membership.can_receive_purchases or product.tracking == 'quantity' and request.membership.can_stock_adjust %}<form class="quick-stock-form" method="post" action="{% url 'quick_stock' product.id %}">{% csrf_token %}<input type="hidden" name="request_key" value="{{ product.quick_key }}"><input type="hidden" name="return_to" value="products">{% if request.membership.can_stock_adjust %}<button class="button button-secondary" name="action" value="remove" aria-label="Decrease stock for {{ product.display_name }}" {% if product.current_stock <= 0 %}disabled{% endif %}>−</button>{% endif %}<label class="sr-only" for="product-stock-{{ product.id }}">Pieces to add or remove for {{ product.display_name }}</label><input id="product-stock-{{ product.id }}" type="number" name="quantity" value="1" min="1" max="100000" step="1" inputmode="numeric" required>{% if request.membership.can_receive_purchases %}<button class="button button-primary" name="action" value="add" aria-label="Increase stock for {{ product.display_name }}">+</button>{% endif %}</form>{% endif %}{% endif %}</td>
           <td class="product-price-cell">{{ request.membership.shop.currency }} {{ product.price|floatformat:2 }}<small>per piece</small></td>
           <td>{% if request.membership.can_costs %}{{ product.cost|default_if_none:"—" }}{% else %}<span class="muted">Hidden</span>{% endif %}</td>
-          {% if request.membership.can_edit_products %}<td><div class="product-row-actions"><a class="button button-secondary" href="{% url 'product_edit' product.pk %}">Edit<span class="sr-only"> {{ product.name }}</span></a><a class="button button-secondary danger-text" href="{% url 'product_delete' product.pk %}">Delete<span class="sr-only"> {{ product.name }}</span></a></div></td>{% endif %}
+          {% if request.membership.can_edit_products %}<td><div class="product-row-actions"><a class="button button-secondary" href="{% url 'product_edit' product.pk %}">Edit<span class="sr-only"> {{ product.display_name }}</span></a><a class="button button-secondary danger-text" href="{% url 'product_delete' product.pk %}">Delete<span class="sr-only"> {{ product.display_name }}</span></a></div></td>{% endif %}
         </tr>
       {% endfor %}</tbody>
     </table>

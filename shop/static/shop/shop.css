@@ -366,9 +366,14 @@
 .cart-panel .bill-price-help{margin-top:6px;font-size:11px;color:var(--muted)}
 .pos-catalog .item-result{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;padding:14px 10px;min-height:72px}
 .pos-catalog .item-result[hidden]{display:none}
-.pos-product-title{display:flex;align-items:baseline;flex-wrap:wrap;gap:8px;line-height:1.5}
-.pos-product-brand{font-size:13px;font-weight:700;overflow-wrap:anywhere}
-.pos-product-model{display:inline-block;padding:3px 9px;border:1px solid #bdd2ff;border-radius:6px;background:#e8f0ff;color:#1746a2;font-size:13px;font-weight:800;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.pos-product-title{display:inline;line-height:1.5}
+.pos-product-brand,.pos-product-model{display:inline;padding:0;border:0;border-radius:0;background:none;color:inherit;font-size:13px;font-weight:700;font-variant-numeric:normal;overflow-wrap:anywhere}
 .pos-catalog .stock-name small{margin-top:5px;font-size:11px}
 .pos-catalog .pos-product-price{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
 .cart-line .pos-product-title{margin-bottom:4px}
+
+.low-stock-actions .low-stock-add{min-height:40px;padding:8px 10px;font-size:11px;white-space:nowrap;flex-shrink:0}
+.low-stock-actions .stock-count{white-space:nowrap;flex-shrink:0}
+@media(max-width:480px){.low-stock-actions li{flex-wrap:wrap}.low-stock-actions .stock-name{flex-basis:calc(100% - 110px)}.low-stock-actions .low-stock-add{margin-left:auto}}
+
+.quick-stock-form{display:flex;align-items:center;gap:5px;flex-shrink:0}.quick-stock-form input{width:64px;min-height:40px;border:1px solid var(--line);border-radius:7px;text-align:center;padding:6px;font-variant-numeric:tabular-nums}.quick-stock-form .button{min-width:40px;min-height:40px;padding:6px;font-size:20px}.quick-stock-form button:disabled{opacity:.4;cursor:not-allowed}.low-stock-actions li{flex-wrap:wrap}.low-stock-actions .quick-stock-form{margin-left:auto}

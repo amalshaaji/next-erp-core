@@ -124,7 +124,7 @@ class StockReceiveForm(forms.Form):
         self.fields["supplier"].queryset = Supplier.objects.filter(shop=shop, is_active=True)
         self.fields["product"].queryset = Product.objects.filter(shop=shop, is_active=True, kind=Product.Kind.STOCK)
         self.fields["product"].label_from_instance = lambda product: (
-            f"{product.name} · {'IMEI / serial' if product.tracking == Product.Tracking.SERIALIZED else 'Quantity'}"
+            f"{product.display_name} · {'IMEI / serial' if product.tracking == Product.Tracking.SERIALIZED else 'Quantity'}"
             f"{' · Second-hand' if product.is_second_hand else ''}"
         )
 

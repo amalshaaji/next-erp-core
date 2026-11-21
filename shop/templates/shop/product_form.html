@@ -1,7 +1,7 @@
 {% extends 'shop/base.html' %}
 {% block title %}{% if product %}Edit product{% else %}Add a product{% endif %}{% endblock %}
 {% block content %}
-<header class="page-header"><div><p class="eyebrow">PRODUCTS</p><h1>{% if product %}Edit {{ product.name }}{% else %}Add a product or service{% endif %}</h1></div></header>
+<header class="page-header"><div><p class="eyebrow">PRODUCTS</p><h1>{% if product %}Edit {{ product.display_name }}{% else %}Add a product or service{% endif %}</h1></div></header>
 <section class="panel form-panel product-form-panel">
   {% if product %}<div class="notice"><p>Changes apply to future sales. Completed receipts and stock history keep their original details.</p>{% if product.kind == 'stock' %}<p><strong>Current stock: {{ product.on_hand }} pieces.</strong> {% if request.membership.can_stock_adjust %}<a href="{% url 'stock_adjustments' %}">Use Stock count to correct inventory.</a>{% else %}Ask your Admin if the stock count needs correcting.{% endif %}</p>{% endif %}</div>{% endif %}
   <form method="post">{% csrf_token %}{{ form.tracking }}

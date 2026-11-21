@@ -10,7 +10,8 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from django.contrib import messages
 from django.core.cache import cache
 from django.db import IntegrityError, connection, transaction
-from django.db.models import Count, Exists, Max, Min, OuterRef, Prefetch, Sum
+from django.db.models.functions import Cast, Concat
+from django.db.models import CharField, Value, Count, Exists, Max, Min, OuterRef, Prefetch, Sum
 from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseForbidden, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
@@ -172,7 +173,7 @@ def dashboard(request):
     for product in product_rows:
         on_hand = serialized_by_product.get(product.pk, 0) if product.tracking == Product.Tracking.SERIALIZED else quantity_by_product.get(product.pk, 0)
         if on_hand <= product.reorder_level:
-            low_stock.append({"name": product.name, "sku": product.sku, "on_hand": on_hand})
+            low_stock.append({"id": product.pk, "tracking": product.tracking, "quick_key": str(uuid.uuid4()), "name": product.name, "brand_model": product.brand_model, "sku": product.sku, "on_hand": on_hand})
     context = {
         "sales_total": financials["net_sales"],
         "refund_total": refund_total,
@@ -191,13 +192,19 @@ def dashboard(request):
 
 
 def product_list(request):
-    catalog = Product.objects.filter(shop=request.membership.shop, is_active=True)
+    catalog = Product.objects.filter(shop=request.membership.shop, is_active=True).annotate(search_label=Concat("name", Value(" "), "brand_model"))
     products = catalog
     query = request.GET.get("q", "").strip()
     if query:
-        products = products.filter(name__icontains=query) | products.filter(sku__icontains=query) | products.filter(brand_model__icontains=query)
+        products = products.filter(name__icontains=query) | products.filter(sku__icontains=query) | products.filter(brand_model__icontains=query) | products.filter(search_label__icontains=query)
     suggestions = catalog.only("name", "brand_model", "sku").order_by("name")[:250]
-    return render(request, "shop/products.html", {"products": products.distinct(), "query": query, "search_suggestions": suggestions})
+    product_rows = list(products.distinct())
+    quantities = {row["product_id"]: row["quantity"] or 0 for row in StockMovement.objects.filter(shop=request.membership.shop, product__in=product_rows, product__tracking=Product.Tracking.QUANTITY).values("product_id").annotate(quantity=Sum("quantity_delta"))}
+    serialized = {row["product_id"]: row["quantity"] for row in Device.objects.filter(shop=request.membership.shop, product__in=product_rows, status=Device.Status.IN_STOCK).values("product_id").annotate(quantity=Count("id"))}
+    for product in product_rows:
+        product.quick_key = str(uuid.uuid4())
+        product.current_stock = serialized.get(product.pk, 0) if product.tracking == Product.Tracking.SERIALIZED else quantities.get(product.pk, 0)
+    return render(request, "shop/products.html", {"products": product_rows, "query": query, "search_suggestions": suggestions})
 
 
 def _product_form_context(form, product=None):
@@ -365,7 +372,19 @@ def product_import_template(request):
 
 @permission_required("purchases")
 def receive_stock(request):
-    form = StockReceiveForm(request.POST or None, shop=request.membership.shop)
+    initial = {}
+    if request.method == "GET" and request.GET.get("product"):
+        try:
+            product_id = int(request.GET["product"])
+        except ValueError:
+            return HttpResponseBadRequest("Choose a valid product.")
+        product = get_object_or_404(Product, pk=product_id, shop=request.membership.shop,
+                                    is_active=True, kind=Product.Kind.STOCK)
+        initial = {"product": product.pk, "is_second_hand": product.is_second_hand}
+        if product.supplier_id and product.supplier.is_active:
+            initial["supplier"] = product.supplier_id
+    form = StockReceiveForm(request.POST if request.method == "POST" else None,
+                            shop=request.membership.shop, initial=initial)
     if request.method == "POST" and form.is_valid():
         product = form.cleaned_data["product"]
         try:
@@ -391,8 +410,8 @@ def receive_stock(request):
                 if form.cleaned_data["unit_cost"] is not None:
                     product.cost = form.cleaned_data["unit_cost"]
                     product.save(update_fields=["cost"])
-                record_event(request.membership.shop, request.membership, "purchasing.stock_received", "purchase", purchase.pk, {"supplier": purchase.supplier.name if purchase.supplier else "", "reference": purchase.reference, "product": product.name, "quantity": form.cleaned_data["quantity"], "second_hand": form.cleaned_data["is_second_hand"]})
-            messages.success(request, f"Received {form.cleaned_data['quantity']} × {product.name} into stock.")
+                record_event(request.membership.shop, request.membership, "purchasing.stock_received", "purchase", purchase.pk, {"supplier": purchase.supplier.name if purchase.supplier else "", "reference": purchase.reference, "product": product.display_name, "quantity": form.cleaned_data["quantity"], "second_hand": form.cleaned_data["is_second_hand"]})
+            messages.success(request, f"Received {form.cleaned_data['quantity']} × {product.display_name} into stock.")
             return redirect("products")
         except Exception as exc:
             if "unique_shop_imei" in str(exc) or "UNIQUE constraint" in str(exc):
@@ -407,7 +426,27 @@ def point_of_sale(request):
     products = Product.objects.filter(shop=shop, is_active=True).order_by("name")
     stock_products = products.filter(kind=Product.Kind.STOCK)
     devices = Device.objects.filter(shop=shop, status=Device.Status.IN_STOCK).select_related("product").order_by("product__name", "imei")
+    quantity_stock = {row["product_id"]: row["quantity"] or 0 for row in StockMovement.objects.filter(shop=shop, product__in=products, product__tracking=Product.Tracking.QUANTITY).values("product_id").annotate(quantity=Sum("quantity_delta"))}
+    serialized_stock = {row["product_id"]: row["quantity"] for row in Device.objects.filter(shop=shop, product__in=products, status=Device.Status.IN_STOCK).values("product_id").annotate(quantity=Count("id"))}
+    for product in products:
+        product.current_stock = serialized_stock.get(product.pk, 0) if product.tracking == Product.Tracking.SERIALIZED else quantity_stock.get(product.pk, 0)
     payload = []
+    source_sale = None
+    source_id = request.POST.get("source_sale") if request.method == "POST" else request.GET.get("source_sale")
+    if source_id:
+        if not request.membership.can("voids"):
+            return HttpResponseForbidden("You need sale-correction permission to reissue a bill.")
+        try:
+            source_id = uuid.UUID(source_id)
+        except ValueError:
+            return HttpResponseBadRequest("Invalid original receipt.")
+        source_sale = get_object_or_404(Sale, pk=source_id, shop=shop, void_record__isnull=False)
+        if not request.membership.can("view_sales") and source_sale.cashier_id != request.membership.pk:
+            return HttpResponseForbidden("You can only reissue your own bills.")
+        if request.method == "GET":
+            payload = [{"product_id": line.product_id, "quantity": line.quantity, "device_id": line.device_id,
+                        **({"unit_price": str(line.unit_price)} if request.membership.can("discounts") else {})}
+                       for line in source_sale.lines.all() if line.product_id]
     if request.method == "POST":
         try:
             idempotency_key = uuid.UUID(request.POST.get("request_key", ""))
@@ -423,6 +462,8 @@ def point_of_sale(request):
             with transaction.atomic():
                 # Serialize receipt numbering and checkout posting per shop.
                 Shop.objects.select_for_update().get(pk=shop.pk)
+                if source_sale and AuditEvent.objects.filter(shop=shop, event_type="sales.completed", details__replaces_sale=str(source_sale.pk)).exists():
+                    raise ValueError("This receipt has already been reissued. Open Sales to view the replacement.")
                 prepared = []
                 price_changes = []
                 reserved_quantities = {}
@@ -438,7 +479,7 @@ def point_of_sale(request):
                     device = None
                     if product.kind == Product.Kind.STOCK and product.tracking == Product.Tracking.SERIALIZED:
                         if quantity != 1 or not raw.get("device_id"):
-                            raise ValueError(f"Select an available IMEI for {product.name}.")
+                            raise ValueError(f"Select an available IMEI for {product.display_name}.")
                         device = get_object_or_404(Device.objects.select_for_update(), pk=int(raw["device_id"]), shop=shop, product=product, status=Device.Status.IN_STOCK)
                         if device.pk in reserved_devices:
                             raise ValueError("The same IMEI cannot appear twice in a bill.")
@@ -446,12 +487,12 @@ def point_of_sale(request):
                     elif product.kind == Product.Kind.STOCK:
                         reserved_quantities[product.pk] = reserved_quantities.get(product.pk, 0) + quantity
                         if product.on_hand < reserved_quantities[product.pk]:
-                            raise ValueError(f"Not enough stock for {product.name}; available: {product.on_hand}.")
+                            raise ValueError(f"Not enough stock for {product.display_name}; available: {product.on_hand}.")
                     unit_price = product.price
                     if "unit_price" in raw:
                         price_form = CheckoutLinePriceForm({"unit_price": raw["unit_price"]})
                         if not price_form.is_valid():
-                            raise ValueError(f"Selling price for {product.name}: {price_form.errors['unit_price'][0]}")
+                            raise ValueError(f"Selling price for {product.display_name}: {price_form.errors['unit_price'][0]}")
                         unit_price = price_form.cleaned_data["unit_price"].quantize(CENT)
                         if unit_price != product.price:
                             if not request.membership.can("discounts"):
@@ -483,7 +524,7 @@ def point_of_sale(request):
                             device.save(update_fields=["status"])
                         StockMovement.objects.create(shop=shop, product=product, device=device, quantity_delta=-quantity, reason=StockMovement.Reason.SALE, note=f"Receipt {sale.receipt_number}", sale=sale, actor=request.membership)
                 Payment.objects.create(sale=sale, tender=tender, amount=total, reference=request.POST.get("payment_reference", "").strip()[:100])
-                record_event(shop, request.membership, "sales.completed", "sale", sale.pk, {"receipt": sale.receipt_number, "total": str(sale.total), "currency": sale.currency, "price_changes": price_changes})
+                record_event(shop, request.membership, "sales.completed", "sale", sale.pk, {"receipt": sale.receipt_number, "total": str(sale.total), "currency": sale.currency, "price_changes": price_changes, "replaces_sale": str(source_sale.pk) if source_sale else None})
             return redirect("receipt", sale_id=sale.pk)
         except IntegrityError:
             previous_sale = Sale.objects.filter(shop=shop, idempotency_key=request.POST.get("request_key", "")).first()
@@ -495,8 +536,8 @@ def point_of_sale(request):
                 retry_key = uuid.UUID(request.POST.get("request_key", ""))
             except (ValueError, TypeError, AttributeError):
                 retry_key = uuid.uuid4()
-            return render(request, "shop/pos.html", {"products": products, "stock_products": stock_products, "devices": devices, "request_key": retry_key, "error": str(exc) or "Please review the sale details.", "cart_payload": payload if isinstance(payload, list) else [], "can_edit_prices": request.membership.can("discounts")})
-    return render(request, "shop/pos.html", {"products": products, "stock_products": stock_products, "devices": devices, "request_key": uuid.uuid4(), "can_edit_prices": request.membership.can("discounts"), "cart_payload": []})
+            return render(request, "shop/pos.html", {"products": products, "stock_products": stock_products, "devices": devices, "request_key": retry_key, "error": str(exc) or "Please review the sale details.", "cart_payload": payload if isinstance(payload, list) else [], "can_edit_prices": request.membership.can("discounts"), "source_sale": source_sale})
+    return render(request, "shop/pos.html", {"products": products, "stock_products": stock_products, "devices": devices, "request_key": uuid.uuid4(), "can_edit_prices": request.membership.can("discounts"), "cart_payload": payload, "source_sale": source_sale})
 
 
 def receipt(request, sale_id):
@@ -535,6 +576,7 @@ def void_sale(request, sale_id):
     sale = get_object_or_404(Sale.objects.filter(shop=shop).select_related("cashier").prefetch_related("lines", "payments"), pk=sale_id)
     if not request.membership.can("view_sales") and sale.cashier_id != request.membership.pk:
         return HttpResponseForbidden("You can only void your own sales unless your Admin grants sales-history access.")
+    reissue = request.POST.get("reissue") == "1" or request.GET.get("reissue") == "1"
     existing_void = SaleVoid.objects.filter(sale=sale).first()
     if request.method == "POST" and not existing_void:
         reason = request.POST.get("reason", "").strip()[:240]
@@ -542,6 +584,7 @@ def void_sale(request, sale_id):
             if not reason:
                 raise ValueError("A reason is required to void this sale.")
             with transaction.atomic():
+                Shop.objects.select_for_update().get(pk=shop.pk)
                 sale = Sale.objects.select_for_update().get(pk=sale.pk, shop=shop)
                 existing_void = SaleVoid.objects.filter(sale=sale).first()
                 if existing_void:
@@ -566,10 +609,13 @@ def void_sale(request, sale_id):
                     Payment.objects.create(sale=sale, void_record=void_record, kind=Payment.Kind.VOID, tender=payment.tender, amount=payment.amount, reference=f"Void receipt {sale.receipt_number}")
                 record_event(shop, request.membership, "sales.voided", "sale", sale.pk, {"receipt": sale.receipt_number, "amount": str(sale.total), "reason": reason})
             messages.success(request, f"Sale {sale.receipt_number} was voided. Stock and payment reversals are linked to the original receipt.")
+            if reissue:
+                from django.urls import reverse
+                return redirect(reverse("pos") + "?source_sale=" + str(sale.pk))
             return redirect("receipt", sale_id=sale.pk)
         except ValueError as exc:
             messages.error(request, str(exc))
-    return render(request, "shop/void_sale.html", {"sale": sale, "void_record": existing_void})
+    return render(request, "shop/void_sale.html", {"sale": sale, "void_record": existing_void, "reissue": reissue})
 
 
 def _report_dates(request):
@@ -824,7 +870,10 @@ def suppliers(request):
         supplier.purchase_count = summary.get("count", 0)
         supplier.last_received = summary.get("last_received")
         supplier.created_on = creation_dates.get(str(supplier.pk))
-    return render(request, "shop/suppliers.html", {"form": form, "suppliers": supplier_rows})
+    purchases = Purchase.objects.filter(shop=shop).select_related("supplier").prefetch_related("stockmovement_set__product").annotate(
+        corrected=Exists(AuditEvent.objects.filter(shop=shop, target_type="purchase", target_id=Cast(OuterRef("pk"), output_field=CharField()), event_type__in=["purchase.entry_edited", "purchase.entry_deleted"]))
+    ).order_by("-created_at")[:100]
+    return render(request, "shop/suppliers.html", {"form": form, "suppliers": supplier_rows, "purchases": purchases})
 
 
 @permission_required("expenses")
@@ -898,14 +947,14 @@ def stock_adjustments(request):
                             raise ValueError("For found stock, the physical count must be higher than the system count.")
                         note = f"Stocktake ({reason_label}): system {current}, counted {counted}. {quantity_form.cleaned_data['note']}".strip()[:240]
                         StockMovement.objects.create(shop=shop, product=product, quantity_delta=delta, reason=StockMovement.Reason.ADJUSTMENT, note=note, actor=request.membership)
-                        record_event(shop, request.membership, "inventory.stocktake", "product", product.pk, {"product": product.name, "before": current, "counted": counted, "delta": delta, "reason": reason_label})
-                    messages.success(request, f"Stock count saved for {product.name}. Change: {delta:+d}.")
+                        record_event(shop, request.membership, "inventory.stocktake", "product", product.pk, {"product": product.display_name, "before": current, "counted": counted, "delta": delta, "reason": reason_label})
+                    messages.success(request, f"Stock count saved for {product.display_name}. Change: {delta:+d}.")
                     return redirect("stock_adjustments")
                 except ValueError as exc:
                     quantity_form.add_error("counted_quantity", str(exc))
         else:
             messages.error(request, "Use the quantity stock-count form to record inventory corrections.")
-    recent = StockMovement.objects.filter(shop=shop, reason=StockMovement.Reason.ADJUSTMENT, device__isnull=True).select_related("product", "actor").order_by("-created_at")[:30]
+    recent = StockMovement.objects.filter(shop=shop, reason=StockMovement.Reason.ADJUSTMENT, device__isnull=True).annotate(corrected=Exists(AuditEvent.objects.filter(shop=shop, target_type="movement", target_id=Cast(OuterRef("pk"), output_field=CharField()), event_type__in=["movement.entry_edited", "movement.entry_deleted"]))).select_related("product", "actor").order_by("-created_at")[:30]
     return render(request, "shop/stock_adjustments.html", {"quantity_form": quantity_form, "recent": recent})
 
 
@@ -971,3 +1020,44 @@ def team(request):
             return redirect("team")
     memberships = Membership.objects.filter(shop=shop).order_by("role", "email")
     return render(request, "shop/team.html", {"staff_form": staff_form, "memberships": memberships, "permission_options": STAFF_PERMISSION_OPTIONS})
+
+
+@require_http_methods(["POST"])
+def quick_stock(request, product_id):
+    member = request.membership
+    return_to = "products" if request.POST.get("return_to") == "products" else "dashboard"
+    action = request.POST.get("action")
+    permission = {"add": "purchases", "remove": "stock_adjust"}.get(action)
+    if not member or not permission or not member.can(permission):
+        return HttpResponseForbidden("You do not have permission for this stock change.")
+    try:
+        quantity = int(request.POST.get("quantity", ""))
+        key = str(uuid.UUID(request.POST.get("request_key", "")))
+        if not 1 <= quantity <= 100000:
+            raise ValueError
+    except (ValueError, TypeError):
+        messages.error(request, "Enter a whole quantity between 1 and 100,000.")
+        return redirect(return_to)
+    with transaction.atomic():
+        Shop.objects.select_for_update().get(pk=member.shop_id)
+        product = get_object_or_404(Product.objects.select_for_update(), pk=product_id,
+                                   shop=member.shop, is_active=True, kind=Product.Kind.STOCK,
+                                   tracking=Product.Tracking.QUANTITY)
+        if AuditEvent.objects.filter(shop=member.shop, event_type="inventory.quick_stock", target_type="stock_request", target_id=key).exists():
+            messages.info(request, "This stock change was already saved.")
+            return redirect(return_to)
+        delta = quantity if action == "add" else -quantity
+        if product.on_hand + delta < 0:
+            messages.error(request, "Cannot remove more pieces than are currently in stock.")
+            return redirect(return_to)
+        purchase = None
+        if action == "add":
+            purchase = Purchase.objects.create(shop=member.shop, supplier=product.supplier,
+                                               reference="Quick stock addition", created_by=member)
+        movement = StockMovement.objects.create(shop=member.shop, product=product, quantity_delta=delta,
+            reason=StockMovement.Reason.PURCHASE if purchase else StockMovement.Reason.ADJUSTMENT,
+            purchase=purchase, actor=member, note="Quick stock addition" if purchase else "Quick stock reduction")
+        record_event(member.shop, member, "inventory.quick_stock", "stock_request", key,
+                     {"product_id": product.pk, "movement_id": movement.pk, "quantity_delta": delta})
+    messages.success(request, f"{product.display_name}: stock changed by {delta:+d} pieces.")
+    return redirect(return_to)

@@ -58,15 +58,16 @@
   {% if recent %}
     <div class="table-wrap" role="region" aria-label="Recent stock counts" tabindex="0">
       <table>
-        <thead><tr><th scope="col">Product</th><th scope="col" class="stock-change-column">Change</th><th scope="col">Reason / note</th><th scope="col">Staff</th><th scope="col">Date</th></tr></thead>
+        <thead><tr><th scope="col">Product</th><th scope="col" class="stock-change-column">Change</th><th scope="col">Reason / note</th><th scope="col">Staff</th><th scope="col">Date</th><th scope="col">Actions</th></tr></thead>
         <tbody>
           {% for movement in recent %}
             <tr>
-              <td><strong>{{ movement.product.name }}</strong>{% if movement.product.sku %}<small>{{ movement.product.sku }}</small>{% endif %}</td>
+              <td><strong>{{ movement.product.display_name }}</strong>{% if movement.product.sku %}<small>{{ movement.product.sku }}</small>{% endif %}</td>
               <td class="stock-change-column">{% if movement.quantity_delta > 0 %}<span class="stock-change positive-change">+{{ movement.quantity_delta }} pcs</span>{% elif movement.quantity_delta < 0 %}<span class="stock-change negative-change">{{ movement.quantity_delta }} pcs</span>{% else %}<span class="stock-change">No change</span>{% endif %}</td>
               <td class="stock-history-note">{{ movement.note }}</td>
               <td>{{ movement.actor.display_name|default:movement.actor.email|default:"—" }}</td>
               <td class="stock-history-date"><time datetime="{{ movement.created_at|date:'c' }}">{{ movement.created_at|date:"d M Y" }}<small>{{ movement.created_at|date:"g:i A" }}</small></time></td>
+              <td>{% if movement.corrected %}<span class="badge">Corrected</span>{% elif movement.purchase_id or movement.sale_id %}<span class="muted">Linked transaction correction</span>{% else %}<a class="text-link action-link" href="{% url 'manage_entry' 'movement' movement.pk 'edit' %}">Edit</a><a class="text-link danger-text" href="{% url 'manage_entry' 'movement' movement.pk 'delete' %}">Delete / reverse</a>{% endif %}</td>
             </tr>
           {% endfor %}
         </tbody>

@@ -14,7 +14,7 @@
   </form>
 </section>
 <section class="panel expense-history">
-  <div class="panel-heading"><div><h2>Expense history</h2><p>Entries cannot be edited. Correct a mistake with a linked correction.</p></div></div>
+  <div class="panel-heading"><div><h2>Expense history</h2><p>Edit or delete entries with linked corrections that preserve the original history.</p></div></div>
   {% if entries %}<div class="table-wrap"><table><thead><tr><th>Date</th><th>Expense</th><th>Details</th><th>Paid by</th><th>Amount</th><th>Recorded by</th><th>Correction</th></tr></thead><tbody>
     {% for entry in entries %}<tr>
       <td>{{ entry.expense_date|date:"d M Y" }}</td>
@@ -23,7 +23,7 @@
       <td>{{ entry.get_payment_method_display }}</td>
       <td>{{ entry.currency }} {{ entry.amount|floatformat:2 }}</td>
       <td>{{ entry.created_by.display_name|default:entry.created_by.email }}</td>
-      <td>{% if entry.reversal_of %}<span class="muted">Linked to #{{ entry.reversal_of_id }}</span>{% elif entry.reversal %}<span class="badge badge-amber">Corrected</span>{% else %}<details class="expense-correction"><summary>Correct</summary><form method="post">{% csrf_token %}<input type="hidden" name="action" value="reverse"><input type="hidden" name="expense_id" value="{{ entry.pk }}"><label for="reason-{{ entry.pk }}">Reason</label><input id="reason-{{ entry.pk }}" name="reason" maxlength="200" required><button class="button button-secondary">Save correction</button></form></details>{% endif %}</td>
+      <td>{% if entry.reversal_of %}<span class="muted">Linked to #{{ entry.reversal_of_id }}</span>{% elif entry.reversal %}<span class="badge badge-amber">Corrected</span>{% else %}<a class="text-link action-link" href="{% url 'manage_entry' 'expense' entry.pk 'edit' %}">Edit</a><a class="text-link danger-text" href="{% url 'manage_entry' 'expense' entry.pk 'delete' %}">Delete / reverse</a>{% endif %}</td>
     </tr>{% endfor %}
   </tbody></table></div>{% else %}<div class="empty-state"><h3>No expenses recorded</h3><p>Start with your latest rent, electricity, or other shop bill.</p></div>{% endif %}
 </section>

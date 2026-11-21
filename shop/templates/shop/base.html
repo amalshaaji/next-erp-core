@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Next{% endblock %} · Next</title>
   <link rel="icon" type="image/png" href="{% static 'shop/favicon.png' %}?v=27613e58122e">
-  <link rel="stylesheet" href="{% static 'shop/shop.css' %}?v=20261122-5">
+  <link rel="stylesheet" href="{% static 'shop/shop.css' %}?v=20261122-7">
   <link rel="stylesheet" href="{% static 'shop/reference-theme.css' %}?v=20261120-4">
 </head>
 <body>
@@ -22,7 +22,7 @@
         {% if request.membership.can_reports %}<a href="{% url 'reports' %}" class="nav-link {% if current == 'reports' %}is-active{% endif %}" {% if current == 'reports' %}aria-current="page"{% endif %}>{% include 'shop/includes/icon.html' with name='receipt' %}Reports</a>{% endif %}
         {% if request.membership.can_stock_adjust or request.membership.can_receive_purchases or request.membership.can_expenses or request.membership.can_refunds or request.membership.role == 'admin' %}<details class="nav-more"><summary class="nav-link">{% include 'shop/includes/icon.html' with name='more' %}More <span aria-hidden="true">⌄</span></summary><div class="nav-menu">
           {% if request.membership.can_stock_adjust %}<a href="{% url 'stock_adjustments' %}">Stock count</a>{% endif %}
-          {% if request.membership.can_receive_purchases %}<a href="{% url 'suppliers' %}">Suppliers & purchases</a>{% endif %}
+          {% if request.membership.can_receive_purchases %}<a href="{% url 'receive_stock' %}">Receive stock</a><a href="{% url 'suppliers' %}">Suppliers & purchases</a>{% endif %}
           {% if request.membership.can_expenses %}<a href="{% url 'expenses' %}">Shop expenses</a>{% endif %}
           {% if request.membership.can_refunds %}<a href="{% url 'returns' %}">Returns & refunds</a>{% endif %}
           {% if request.membership.role == 'admin' %}<a href="{% url 'team' %}">Team access</a><a href="{% url 'shop_settings' %}">Shop settings</a>{% endif %}

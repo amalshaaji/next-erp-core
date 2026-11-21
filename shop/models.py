@@ -125,8 +125,12 @@ class Product(models.Model):
         ordering = ["name"]
         constraints = [models.UniqueConstraint(fields=["shop", "sku"], condition=~models.Q(sku=""), name="unique_shop_sku")]
 
+    @property
+    def display_name(self):
+        return " ".join(value for value in (self.name, self.brand_model) if value)
+
     def __str__(self):
-        return self.name
+        return self.display_name
 
     @property
     def on_hand(self):
@@ -170,7 +174,7 @@ class Device(models.Model):
         ordering = ["imei"]
 
     def __str__(self):
-        return f"{self.imei} · {self.product.name}"
+        return f"{self.imei} · {self.product.display_name}"
 
 
 class Supplier(models.Model):

@@ -74,7 +74,7 @@
         </div>
         {% if member.role == 'staff' and member.is_active %}
         <details class="permission-editor">
-          <summary>Change access</summary>
+          <summary>Edit permissions</summary>
           <form method="post">
             {% csrf_token %}
             <input type="hidden" name="action" value="permissions">
@@ -85,12 +85,7 @@
             <button class="button button-secondary">Save access</button>
           </form>
         </details>
-        <form method="post" onsubmit="return confirm('Remove this staff member’s access to the shop?')">
-          {% csrf_token %}
-          <input type="hidden" name="action" value="deactivate">
-          <input type="hidden" name="member_id" value="{{ member.pk }}">
-          <button class="text-button danger-text">Deactivate</button>
-        </form>
+        <div class="product-row-actions"><a class="button button-secondary" href="{% url 'manage_entry' 'member' member.pk 'edit' %}">Edit staff</a><a class="button button-secondary danger-text" href="{% url 'manage_entry' 'member' member.pk 'delete' %}">Delete access</a></div>
         {% endif %}
       </article>
       {% empty %}<div class="empty-state compact"><p>No team members found.</p></div>{% endfor %}

@@ -3,7 +3,7 @@
 {% block content %}
 <header class="page-header"><div><p class="eyebrow">PRODUCTS</p><h1>Delete product</h1><p class="subheading">Review this item before deleting it.</p></div></header>
 <section class="panel form-panel">
-  <h2>{{ product.name }}</h2>
+  <h2>{{ product.display_name }}</h2>
   {% if product.sku %}<p>SKU: {{ product.sku }}</p>{% endif %}
   <div class="notice notice-warning">
     <p>This item will be removed from Products &amp; inventory and will no longer be available for new sales or stock receipts.</p>
