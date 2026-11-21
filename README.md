@@ -5,13 +5,13 @@ Starter implementation for the product described in [PRD.md](PRD.md). Built with
 ## Current implementation
 
 - Supabase session verification middleware and Admin/Staff shop membership.
-- Beginner-friendly overview, product catalog, checkout, and printable receipt screens.
+- Beginner-friendly overview, product catalog, checkout with optional customer mobile, and responsive invoice/receipt screens.
 - Quantity and IMEI-tracked inventory, used-phone intake with condition/cost fields, and stock receiving.
 - Service items can be billed in POS without changing stock.
 - Server-side shop scoping, permission checks, Supabase Auth staff invitations/access management, and stock movement records.
 - Receipt-linked partial returns and manually recorded refunds with serialized device disposition.
 - Initial shop/Admin provisioning command.
-- Admin shop settings for business name, currency, time zone, tax rate, and receipt footer; completed sales retain shop-name, currency, tax-rate, and receipt-footer snapshots.
+- Admin shop settings for business name, address, phone, email, currency, time zone, tax rate, and receipt note; completed sales retain shop contact, currency, tax-rate, and receipt-note snapshots.
 - Supplier records with archiving, supplier-linked stock receiving, and recent purchase history.
 - Date-filtered reports for net sales/refunds, tender totals, low stock, product/service revenue, known costs/margins, and permission-gated CSV export.
 - Permission-controlled quantity stocktakes and IMEI-based serialized device status corrections with required reasons and movement history.

@@ -153,9 +153,9 @@ class StaffPermissionsForm(forms.Form):
 class ShopSettingsForm(forms.ModelForm):
     class Meta:
         model = Shop
-        fields = ["name", "phone", "currency", "timezone", "tax_rate", "receipt_footer"]
-        labels = {"name": "Shop name", "phone": "Shop phone number", "currency": "Currency code", "timezone": "Time zone", "tax_rate": "Tax rate (%)", "receipt_footer": "Receipt message"}
-        help_texts = {"phone": "Printed on new bills, including the 80 mm thermal receipt.", "currency": "Use a three-letter code, for example INR, USD, or EUR.", "tax_rate": "Enter 0 if tax is not configured. The rate is applied to new sales.", "receipt_footer": "A short note printed at the bottom of receipts."}
+        fields = ["name", "address", "phone", "email", "currency", "timezone", "tax_rate", "receipt_footer"]
+        labels = {"name": "Shop name", "address": "Shop address", "phone": "Shop mobile number", "email": "Shop email", "currency": "Currency code", "timezone": "Time zone", "tax_rate": "Tax rate (%)", "receipt_footer": "Receipt note"}
+        help_texts = {"address": "Printed below your shop name on new bills.", "phone": "Printed on new bills, including the 80 mm thermal receipt.", "email": "Printed on new bills when provided.", "currency": "Use a three-letter code, for example INR, USD, or EUR.", "tax_rate": "Enter 0 if tax is not configured. The rate is applied to new sales.", "receipt_footer": "A short note printed at the bottom of receipts."}
 
     def clean_currency(self):
         value = self.cleaned_data["currency"].strip().upper()

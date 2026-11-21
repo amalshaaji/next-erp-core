@@ -2,7 +2,7 @@ import json
 import uuid
 from decimal import Decimal
 
-from django.test import RequestFactory, SimpleTestCase, TestCase
+from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
 
 from .decorators import permission_required
 from .forms import ProductForm
@@ -106,11 +106,12 @@ class CheckoutIdempotencyTests(TestCase):
             actor=self.membership,
         )
 
-    def _post_checkout(self, request_key):
+    def _post_checkout(self, request_key, **customer_details):
         request = RequestFactory().post("/sell/", {
             "request_key": str(request_key),
             "cart_json": json.dumps([{"product_id": self.product.pk, "quantity": 1}]),
             "tender": "cash",
+            **customer_details,
         })
         request.membership = self.membership
         return point_of_sale(request)
@@ -127,6 +128,34 @@ class CheckoutIdempotencyTests(TestCase):
         self.assertEqual(Payment.objects.filter(sale=sale).count(), 1)
         self.assertEqual(StockMovement.objects.filter(sale=sale).count(), 1)
         self.assertEqual(self.product.on_hand, 4)
+
+    @override_settings(STORAGES={
+        "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+        "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+    })
+    def test_invoice_preserves_contact_details_after_shop_settings_change(self):
+        from .views import receipt
+
+        self.shop.address = "Original shop address"
+        self.shop.phone = "9000000000"
+        self.shop.email = "original@example.com"
+        self.shop.save()
+        self._post_checkout(uuid.uuid4(), customer_phone=" 9111111111 ")
+        sale = Sale.objects.get(shop=self.shop)
+
+        self.shop.address = "Updated shop address"
+        self.shop.phone = "9222222222"
+        self.shop.email = "updated@example.com"
+        self.shop.save()
+        request = RequestFactory().get(f"/receipts/{sale.pk}/")
+        request.membership = self.membership
+        response = receipt(request, sale.pk)
+
+        self.assertEqual(sale.customer_phone, "9111111111")
+        for original in ("Original shop address", "9000000000", "original@example.com", "9111111111"):
+            self.assertContains(response, original)
+        for updated in ("Updated shop address", "9222222222", "updated@example.com"):
+            self.assertNotContains(response, updated)
 
     def test_service_without_cost_does_not_mark_profit_incomplete(self):
         service = Product.objects.create(
