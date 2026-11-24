@@ -11,7 +11,7 @@ from django.contrib import messages
 from django.core.cache import cache
 from django.db import IntegrityError, connection, transaction
 from django.db.models.functions import Cast, Concat
-from django.db.models import CharField, Value, Count, Exists, Max, Min, OuterRef, Prefetch, Sum
+from django.db.models import CharField, TextField, Value, Count, Exists, Max, Min, OuterRef, Prefetch, Sum
 from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseForbidden, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
@@ -193,7 +193,7 @@ def dashboard(request):
 
 
 def product_list(request):
-    catalog = Product.objects.filter(shop=request.membership.shop, is_active=True).annotate(search_label=Concat("name", Value(" "), "brand_model"))
+    catalog = Product.objects.filter(shop=request.membership.shop, is_active=True).annotate(search_label=Concat("name", Value(" "), "brand_model", output_field=TextField()))
     products = catalog
     query = request.GET.get("q", "").strip()
     if query:
