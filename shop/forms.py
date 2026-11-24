@@ -21,6 +21,8 @@ class ProductForm(forms.ModelForm):
             "reorder_level": "Show an alert when stock reaches this quantity.",
         }
         widgets = {
+            "name": forms.Textarea(attrs={"rows": 2}),
+            "brand_model": forms.Textarea(attrs={"rows": 3}),
             "price": forms.NumberInput(attrs={"step": "0.01", "placeholder": "0"}),
             "cost": forms.NumberInput(attrs={"step": "0.01", "placeholder": "0"}),
             "reorder_level": forms.NumberInput(attrs={"min": "0", "step": "1", "placeholder": "0"}),

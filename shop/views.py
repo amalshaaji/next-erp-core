@@ -517,7 +517,7 @@ def point_of_sale(request):
                 for (product, quantity, device, unit_price, line_amount), line_tax in zip(prepared, line_taxes):
                     product_label = " ".join(value for value in (product.name, product.brand_model) if value)
                     device_suffix = f" · {device.imei} · {device.get_condition_display() if device.condition else 'New'}" if device else ""
-                    description = product_label[:180 - len(device_suffix)] + device_suffix
+                    description = product_label + device_suffix
                     SaleLine.objects.create(sale=sale, product=product, device=device, description=description, item_kind=product.kind, quantity=quantity, unit_price=unit_price, unit_cost=device.acquisition_cost if device else product.cost, tax_amount=line_tax, line_total=line_amount + line_tax)
                     if product.kind == Product.Kind.STOCK:
                         if device:

@@ -76,14 +76,14 @@ def preview_product_csv(upload, shop):
             row_errors.append("reorder_level and opening_quantity must be zero or greater whole numbers")
         imeis = [value.strip() for value in row.get("imeis", "").split("|") if value.strip()]
 
-        if not name or len(name) > 180:
-            row_errors.append("name is required and must be 180 characters or fewer")
+        if not name:
+            row_errors.append("name is required")
         if len(sku) > 80:
             row_errors.append("sku must be 80 characters or fewer")
         if second_hand_raw not in {"true", "false", "yes", "no", "1", "0"}:
             row_errors.append("is_second_hand must be true or false")
-        if len(row.get("category", "")) > 100 or len(row.get("brand_model", "")) > 160:
-            row_errors.append("category must be 100 characters or fewer and brand_model 160 characters or fewer")
+        if len(row.get("category", "")) > 100:
+            row_errors.append("category must be 100 characters or fewer")
         if len(row.get("included_accessories", "")) > 240 or len(row.get("acquisition_source", "")) > 120:
             row_errors.append("included_accessories must be 240 characters or fewer and acquisition_source 120 characters or fewer")
         if kind not in {Product.Kind.STOCK, Product.Kind.SERVICE}:

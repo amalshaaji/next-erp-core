@@ -107,10 +107,10 @@ class Product(models.Model):
         SERIALIZED = "serialized", "IMEI / serial"
 
     shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name="products")
-    name = models.CharField(max_length=180)
+    name = models.TextField()
     sku = models.CharField(max_length=80, blank=True)
     category = models.CharField(max_length=100, blank=True)
-    brand_model = models.CharField(max_length=160, blank=True)
+    brand_model = models.TextField(blank=True)
     supplier = models.ForeignKey("Supplier", null=True, blank=True, on_delete=models.SET_NULL, related_name="products")
     kind = models.CharField(max_length=10, choices=Kind.choices, default=Kind.STOCK)
     tracking = models.CharField(max_length=12, choices=Tracking.choices, default=Tracking.QUANTITY)
@@ -299,7 +299,7 @@ class SaleLine(models.Model):
     sale = models.ForeignKey(Sale, on_delete=models.PROTECT, related_name="lines")
     product = models.ForeignKey(Product, null=True, blank=True, on_delete=models.SET_NULL)
     device = models.ForeignKey(Device, null=True, blank=True, on_delete=models.PROTECT)
-    description = models.CharField(max_length=180)
+    description = models.TextField()
     item_kind = models.CharField(max_length=10, choices=Product.Kind.choices, default=Product.Kind.STOCK)
     quantity = models.PositiveIntegerField(default=1)
     unit_price = models.DecimalField(max_digits=12, decimal_places=2)
