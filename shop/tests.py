@@ -476,6 +476,32 @@ class ProductManagementTests(TestCase):
         )
         return sale
 
+    def test_catalog_and_search_render_long_product_names_and_models(self):
+        self.product.name = "Phone brand " + "A" * 180
+        self.product.brand_model = "Model " + "B" * 180
+        self.product.save(update_fields=["name", "brand_model"])
+
+        for query in ("", self.product.name, self.product.brand_model,
+                      self.product.sku, self.product.display_name):
+            with self.subTest(query=query):
+                response = self.client.get("/products/", {"q": query})
+                self.assertContains(response, self.product.name)
+                self.assertContains(response, self.product.brand_model)
+                self.assertEqual([row.pk for row in response.context["products"]], [self.product.pk])
+                self.assertEqual(response.context["products"][0].current_stock, 5)
+
+    def test_catalog_search_and_suggestions_exclude_other_shops_and_deleted_items(self):
+        other_shop = Shop.objects.create(name="Other catalog")
+        Product.objects.create(shop=other_shop, name="Private product", brand_model="Secret model", sku="PRIVATE")
+        Product.objects.create(shop=self.shop, name="Deleted product", brand_model="Archived model", sku="DELETED", is_active=False)
+
+        for query in ("", "Private", "Secret model", "PRIVATE", "Deleted", "Archived model", "DELETED", "no match"):
+            with self.subTest(query=query):
+                response = self.client.get("/products/", {"q": query})
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual([row.pk for row in response.context["products"]], [self.product.pk] if not query else [])
+                self.assertEqual([row.pk for row in response.context["search_suggestions"]], [self.product.pk])
+
     def test_row_actions_and_routes_require_product_permission(self):
         self.assertContains(self.client.get("/products/"), self.edit_url)
         self.assertContains(self.client.get("/products/"), self.delete_url)
