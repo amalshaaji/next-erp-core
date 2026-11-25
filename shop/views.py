@@ -9,7 +9,7 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 from django.contrib import messages
 from django.core.cache import cache
-from django.db import IntegrityError, connection, transaction
+from django.db import IntegrityError, InterfaceError, OperationalError, connection, transaction
 from django.db.models.functions import Cast, Concat
 from django.db.models import CharField, TextField, Value, Count, Exists, Max, Min, OuterRef, Prefetch, Sum
 from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseForbidden, JsonResponse
@@ -17,6 +17,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from jwt import PyJWKClientConnectionError
 
 from .decorators import permission_required
 from .forms import CheckoutLinePriceForm, ExpenseForm, ExpenseReversalForm, STAFF_PERMISSION_OPTIONS, ProductForm, ProductImportForm, QuantityStocktakeForm, ShopSettingsForm, StaffAccountForm, StaffPermissionsForm, StockReceiveForm, SupplierForm
@@ -25,7 +26,7 @@ from .services.supabase_api import SupabaseApiError, create_user
 from .services.reporting import build_daily_financials, build_report, calculate_financials
 from .services.imports import preview_product_csv
 from .services.audit import record_event
-from .services.auth import resolve_membership, verify_access_token
+from .services.auth import SupabaseAuthUnavailable, resolve_membership, verify_access_token
 
 
 CENT = Decimal("0.01")
@@ -47,6 +48,12 @@ def auth_session(request):
     try:
         claims = verify_access_token(token)
         membership = resolve_membership(claims["sub"], token)
+    except (SupabaseAuthUnavailable, PyJWKClientConnectionError, OperationalError, InterfaceError) as exc:
+        logger.warning("Sign-in temporarily unavailable (%s).", type(exc).__name__)
+        response = JsonResponse({"error": "Sign-in is temporarily unavailable. Please try again shortly."}, status=503)
+        response["Retry-After"] = "30"
+        response["Cache-Control"] = "no-store"
+        return response
     except Exception as exc:
         logger.warning("Supabase sign-in verification failed (%s).", type(exc).__name__)
         return JsonResponse({"error": "Supabase could not verify this sign-in. Please try again."}, status=401)
@@ -59,10 +66,12 @@ def auth_session(request):
 
 
 def health(request):
+    component = "database"
     try:
         with connection.cursor() as cursor:
             cursor.execute("SELECT 1")
             cursor.fetchone()
+        component = "cache"
         cache_key = f"health-check:{uuid.uuid4()}"
         cache.set(cache_key, "ok", timeout=5)
         cache_healthy = cache.get(cache_key) == "ok"
@@ -70,7 +79,7 @@ def health(request):
         if not cache_healthy:
             raise RuntimeError("Cache health check failed")
     except Exception as exc:
-        logger.warning("Health check failed (%s).", type(exc).__name__)
+        logger.warning("Health check failed for %s (%s).", component, type(exc).__name__)
         return HttpResponse("unavailable", status=503, content_type="text/plain")
     return HttpResponse("ok", content_type="text/plain")
 

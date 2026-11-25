@@ -84,6 +84,7 @@ Give a small mobile shop one beginner-friendly place to record sales, stock, sup
 - Authentication: Supabase Auth; authorization and shop isolation: Django.
 - Production database: Supabase PostgreSQL over TLS, with Django ORM migrations as the schema source of truth.
 - Production requires `DEBUG=False`, a strong unique Django secret, exact hosts and HTTPS origins, Supabase Auth keys, PostgreSQL, and a shared Redis cache.
+- A temporary Redis outage must not prevent verified users from working: session claims are reverified through Supabase when the cache is unavailable, and session audit events are deduplicated in PostgreSQL. Authentication and shop permissions remain enforced. If identity or database access cannot be verified, show a safe temporary-unavailability response without automatically retrying a submitted transaction.
 - Hosted previews may use `DEBUG=False` with `DJANGO_PREVIEW=True` and Supabase test-project keys.
 - Production operations require managed HTTPS, static file hosting, monitored errors, database backups, and a rehearsed restore process.
 - Deployment provider, production domain, Redis service, backup policy, and alerting provider are environment decisions and are not provisioned by this repository.

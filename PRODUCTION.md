@@ -75,6 +75,9 @@ The failure notification for commit `9d11cfa64d4fcffdff58196bf57d21d1ac37104b` i
 
 ## 5. Operations and recovery
 
+- Use an always-on web compute plan for the live shop. Free Render web services can sleep and share a workspace usage allowance; Free Key Value instances can restart without preserving cache data. The app handles a temporary cache outage by reverifying Supabase identity and checking session audit history in PostgreSQL, rather than allowing Redis failure to crash every protected page.
+- Monitor `/health/` from outside the service and enable Render failure notifications. A healthy response is HTTP 200 with `ok`; HTTP 503 with `unavailable` means the database or cache check failed. Safe log messages identify the failing component without printing connection strings. The current live Render service uses TCP health checks; HTTP readiness settings must be reviewed separately so a cache-only outage does not unnecessarily remove a functioning app from service.
+- Database and identity-provider outages fail closed with a temporary-unavailability response. Submitted transactions are never automatically replayed. If a connection failed while saving a sale, check for its receipt before trying again; reuse the existing request key when retrying a known checkout submission.
 - Enable scheduled Supabase backups/PITR appropriate to the business's recovery objectives. Document who can restore a backup and periodically rehearse restoration into a separate database.
 - Send application and platform errors to a monitored logging/alerting service. Keep logs free of session tokens, secrets, and unnecessary customer data. Alert on failed database connections, elevated 5xx rates, and failed scheduled backups.
 - Track deployment revisions and migration status. Back up before risky schema or data changes and use a reviewed rollback/forward-fix procedure.

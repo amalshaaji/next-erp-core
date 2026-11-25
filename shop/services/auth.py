@@ -5,11 +5,11 @@ from urllib.request import Request, urlopen
 
 import jwt
 from django.conf import settings
-from django.core.cache import cache
 from django.db import IntegrityError, transaction
 from jwt import PyJWKClient
 
 from ..models import Membership
+from . import optional_cache
 from .tls import verified_ssl_context
 
 _jwks = None
@@ -19,27 +19,35 @@ class SupabaseAuthError(ValueError):
     """Raised when a Supabase session cannot be verified."""
 
 
+class SupabaseAuthUnavailable(SupabaseAuthError):
+    """The provider is temporarily unreachable; no identity is assumed."""
+
+
 def get_authenticated_user(token):
     if not settings.SUPABASE_URL or not settings.SUPABASE_ANON_KEY:
-        raise SupabaseAuthError("Supabase Auth is not configured")
+        raise SupabaseAuthUnavailable("Supabase Auth is not configured")
     request = Request(
         f"{settings.SUPABASE_URL}/auth/v1/user",
         headers={"apikey": settings.SUPABASE_ANON_KEY, "Authorization": f"Bearer {token}"},
     )
     try:
         with urlopen(request, timeout=8, context=verified_ssl_context()) as response:
-            return json.loads(response.read().decode("utf-8"))
-    except (HTTPError, URLError, TimeoutError, OSError, ValueError) as exc:
-        raise SupabaseAuthError("Supabase could not verify the session.") from exc
+            user = json.loads(response.read().decode("utf-8"))
+        if not isinstance(user, dict) or not isinstance(user.get("id"), str):
+            raise SupabaseAuthUnavailable("Sign-in is temporarily unavailable. Please try again shortly.")
+        return user
+    except HTTPError as exc:
+        if exc.code in {401, 403}:
+            raise SupabaseAuthError("Supabase could not verify the session.") from exc
+        raise SupabaseAuthUnavailable("Sign-in is temporarily unavailable. Please try again shortly.") from exc
+    except (URLError, TimeoutError, OSError, ValueError) as exc:
+        raise SupabaseAuthUnavailable("Sign-in is temporarily unavailable. Please try again shortly.") from exc
 
 
 def _verify_hs256_session(token, issuer):
     """Verify legacy HS256 sessions through Supabase Auth, never with a shared secret."""
     cache_key = "supabase-session-claims:" + hashlib.sha256(token.encode()).hexdigest()
-    claims = cache.get(cache_key)
-    if claims is not None:
-        return claims
-    user = get_authenticated_user(token)
+    # Recheck expiry, issuer, and audience even on a previously verified cache hit.
     claims = jwt.decode(
         token,
         options={
@@ -53,9 +61,12 @@ def _verify_hs256_session(token, issuer):
         issuer=issuer,
         audience="authenticated",
     )
+    if optional_cache.get(cache_key) is not None:
+        return claims
+    user = get_authenticated_user(token)
     if user.get("id") != claims["sub"]:
         raise SupabaseAuthError("Supabase session identity did not match.")
-    cache.set(cache_key, claims, timeout=30)
+    optional_cache.set(cache_key, claims, timeout=30)
     return claims
 
 
@@ -74,6 +85,7 @@ def verify_access_token(token):
             settings.SUPABASE_JWKS_URL,
             cache_keys=True,
             ssl_context=verified_ssl_context(),
+            timeout=8,
         )
     key = _jwks.get_signing_key_from_jwt(token).key
     return jwt.decode(

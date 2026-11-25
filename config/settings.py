@@ -57,6 +57,8 @@ if database_max_age < 0:
 if database_url:
     import dj_database_url
     DATABASES = {"default": dj_database_url.parse(database_url, conn_max_age=database_max_age, ssl_require=True)}
+    DATABASES["default"]["CONN_HEALTH_CHECKS"] = True
+    DATABASES["default"].setdefault("OPTIONS", {})["connect_timeout"] = 5
     DATABASES["default"]["DISABLE_SERVER_SIDE_CURSORS"] = environment_bool("DB_DISABLE_SERVER_SIDE_CURSORS", "False")
 else:
     DATABASES = {"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": BASE_DIR / "db.sqlite3"}}
@@ -132,4 +134,5 @@ if cache_url:
         "BACKEND": "django.core.cache.backends.redis.RedisCache",
         "LOCATION": cache_url,
         "KEY_PREFIX": os.environ.get("CACHE_KEY_PREFIX", "bill-tech"),
+        "OPTIONS": {"socket_connect_timeout": 2, "socket_timeout": 2},
     }}
